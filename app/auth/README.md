@@ -3,7 +3,7 @@
 # Cài dependencies
 npm install
 
-# Chạy test toàn bôj
+# Chạy test toàn bộ
 npm test
 
 # Chạy test + Coverage (bắt buộc để gửi lên SonarCloud)
