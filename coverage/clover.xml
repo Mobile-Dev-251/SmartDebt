@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1765298261358" clover="3.2.0">
+  <project timestamp="1765298261358" name="All files">
+    <metrics statements="19" coveredstatements="19" conditionals="2" coveredconditionals="1" methods="5" coveredmethods="4" elements="26" coveredelements="24" complexity="0" loc="19" ncloc="19" packages="3" files="3" classes="3"/>
+    <package name="app.auth">
+      <metrics statements="7" coveredstatements="7" conditionals="0" coveredconditionals="0" methods="3" coveredmethods="2"/>
+      <file name="AuthScreen.tsx" path="D:\Work\Workstation\HCMUT\Mobile app\Test\SmartDebt\app\auth\AuthScreen.tsx">
+        <metrics statements="7" coveredstatements="7" conditionals="0" coveredconditionals="0" methods="3" coveredmethods="2"/>
+        <line num="15" count="1" type="stmt"/>
+        <line num="17" count="1" type="stmt"/>
+        <line num="18" count="3" type="stmt"/>
+        <line num="20" count="3" type="stmt"/>
+        <line num="21" count="3" type="stmt"/>
+        <line num="23" count="3" type="stmt"/>
+        <line num="58" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="constants">
+      <metrics statements="4" coveredstatements="4" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      <file name="theme.ts" path="D:\Work\Workstation\HCMUT\Mobile app\Test\SmartDebt\constants\theme.ts">
+        <metrics statements="4" coveredstatements="4" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="3" count="1" type="stmt"/>
+        <line num="14" count="1" type="stmt"/>
+        <line num="28" count="1" type="stmt"/>
+        <line num="45" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="utils">
+      <metrics statements="8" coveredstatements="8" conditionals="2" coveredconditionals="1" methods="2" coveredmethods="2"/>
+      <file name="stylings.ts" path="D:\Work\Workstation\HCMUT\Mobile app\Test\SmartDebt\utils\stylings.ts">
+        <metrics statements="8" coveredstatements="8" conditionals="2" coveredconditionals="1" methods="2" coveredmethods="2"/>
+        <line num="3" count="1" type="stmt"/>
+        <line num="6" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="10" count="1" type="stmt"/>
+        <line num="11" count="1" type="stmt"/>
+        <line num="13" count="1" type="stmt"/>
+        <line num="14" count="16" type="stmt"/>
+        <line num="16" count="1" type="stmt"/>
+        <line num="17" count="22" type="stmt"/>
+      </file>
+    </package>
+  </project>
+</coverage>
