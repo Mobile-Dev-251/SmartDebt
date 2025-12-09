@@ -1,4 +1,4 @@
-# Hướng dẫn cách chạy test llocal
+# Hướng dẫn cách chạy test local
 
 # Cài dependencies
 npm install
