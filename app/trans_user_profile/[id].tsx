@@ -273,11 +273,12 @@ const styles = StyleSheet.create({
   addBtn: {
     flexDirection: 'row',
     backgroundColor: '#3875F6',
+    justifyContent: 'center',
     paddingVertical: 10,
-    paddingHorizontal: 20,
+    // paddingHorizontal: 10,
     borderRadius: 12,
     alignItems: 'center',
-    width: width * 0.475
+    width: width * 0.52
   },
   addBtnText: {
     color: '#FFFFFF',

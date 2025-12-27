@@ -63,7 +63,7 @@ export default Sentry.wrap(function RootLayout() {
         }}
       >
         <Stack.Screen
-          name="OnboardingScreen"
+          name="HomeScreen"
           options={{ title: "Smart Debt" }}
         />
       </Stack>
