@@ -122,7 +122,7 @@ const GroupMembersScreen = () => {
       </View>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.addBtn} onPress={() => router.push({ pathname: '/screen/select-screen', params: { type: 'user', groupId } })}>
+        <TouchableOpacity style={styles.addBtn} onPress={() => {}}>
           <Text style={{ color: '#fff', fontWeight: 'bold', fontFamily: 'Roboto', fontSize: 20 }}>Thêm thành viên</Text>
         </TouchableOpacity>
       </View>
