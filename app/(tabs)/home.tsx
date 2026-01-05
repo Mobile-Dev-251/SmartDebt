@@ -225,7 +225,13 @@ const HomeScreen = () => {
       <TouchableOpacity
         style={styles.fab}
         activeOpacity={0.9}
-        onPress={() => router.push("/screen/add-transaction")}
+        onPress={() => router.push({
+          pathname: "/screen/add-transaction",
+          params: {
+            userName: "",
+            type: 'custom'
+          }
+        })}
       >
         <Plus size={32} color="#fff" weight="bold" />
       </TouchableOpacity>

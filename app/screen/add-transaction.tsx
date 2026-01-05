@@ -35,7 +35,7 @@ const addTransactionScreen = () => {
   const [amount, setAmount] = useState(saved.amount ?? "50000");
   const [note, setNote] = useState(saved.note ?? "");
 
-  const [type, setType] = useState(saved.type ?? "muon");
+  const [type, setType] = useState((params.type === 'group' ? 'chi' : saved.type) || "muon");
   const [reminder, setReminder] = useState(saved.reminder ?? "1_day");
   const [date, setDate] = useState(saved.date ? new Date(saved.date) : new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -84,6 +84,7 @@ const addTransactionScreen = () => {
   const typeData = [
     { label: 'Mượn nợ', value: 'muon' },
     { label: 'Cho mượn', value: 'cho_muon' },
+    { label: 'Khoản chi nhóm', value: 'chi'}
   ];
 
   const reminderData = [
@@ -149,21 +150,21 @@ const addTransactionScreen = () => {
           {/* TODO */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Loại</Text>
-            {userType == 'user' && (
+            {userType !== 'group' && (
             <Dropdown
               style={styles.dropdown}
               containerStyle={styles.dropdownContainer}
               itemTextStyle={styles.itemText}
               selectedTextStyle={styles.selectedText}
               activeColor={'#1e1e1e'}
-              data={typeData}
+              data={userType == 'user'? typeData.slice(0, 2) : typeData}
               labelField="label"
               valueField="value"
               value={type}
               onChange={item => setType(item.value)}
               renderRightIcon={() => <Ionicons name="chevron-down" size={20} color="#AAA" />}
             />)}
-            {userType != 'user' && (
+            {userType === 'group' && (
               <View style={[styles.input, styles.disabledInput]}>
                 <Text style={styles.selectedText}>Chi tiêu nhóm</Text>
               </View>
