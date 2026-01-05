@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -8,6 +8,8 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
+  Alert,
+  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -16,17 +18,19 @@ import {
   CaretDown,
 } from "phosphor-react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import * as ImagePicker from "expo-image-picker";
 import { colors, spacingX, spacingY, radius } from "@/constants/theme";
 import { scale } from "@/utils/stylings";
 
 const ProfileInfoScreen = () => {
   const router = useRouter();
-  const [fullName, setFullName] = React.useState("Hoàng Phương Bình");
-  const [phone, setPhone] = React.useState("0123456789");
-  const [gender, setGender] = React.useState<"Nam" | "Nữ" | "Khác">("Nam");
-  const [showGender, setShowGender] = React.useState(false);
-  const [birth, setBirth] = React.useState("01/01/2004");
-  const [showBirth, setShowBirth] = React.useState(false);
+  const [fullName, setFullName] = useState("Hoàng Phương Bình");
+  const [phone, setPhone] = useState("0123456789");
+  const [gender, setGender] = useState<"Nam" | "Nữ" | "Khác">("Nam");
+  const [showGender, setShowGender] = useState(false);
+  const [birth, setBirth] = useState("01/01/2004");
+  const [showBirth, setShowBirth] = useState(false);
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
   const formatDate = (d: Date) => {
     const dd = String(d.getDate()).padStart(2, "0");
@@ -38,6 +42,84 @@ const ProfileInfoScreen = () => {
   const parseDate = (value: string) => {
     const [dd, mm, yyyy] = value.split("/").map((p) => parseInt(p, 10));
     return new Date(yyyy, mm - 1, dd);
+  };
+
+  const requestImagePickerPermission = async () => {
+    if (Platform.OS !== "web") {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Cần quyền truy cập",
+          "Ứng dụng cần quyền truy cập thư viện ảnh để cập nhật avatar"
+        );
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const pickImage = async () => {
+    const hasPermission = await requestImagePickerPermission();
+    if (!hasPermission) return;
+
+    Alert.alert(
+      "Chọn ảnh",
+      "Bạn muốn chọn ảnh từ đâu?",
+      [
+        {
+          text: "Hủy",
+          style: "cancel",
+        },
+        {
+          text: "Thư viện",
+          onPress: async () => {
+            try {
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+              });
+
+              if (!result.canceled && result.assets[0]) {
+                setAvatarUri(result.assets[0].uri);
+              }
+            } catch (error) {
+              Alert.alert("Lỗi", "Không thể chọn ảnh từ thư viện");
+            }
+          },
+        },
+        {
+          text: "Camera",
+          onPress: async () => {
+            try {
+              const { status } =
+                await ImagePicker.requestCameraPermissionsAsync();
+              if (status !== "granted") {
+                Alert.alert(
+                  "Cần quyền truy cập",
+                  "Ứng dụng cần quyền truy cập camera để chụp ảnh"
+                );
+                return;
+              }
+
+              const result = await ImagePicker.launchCameraAsync({
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+              });
+
+              if (!result.canceled && result.assets[0]) {
+                setAvatarUri(result.assets[0].uri);
+              }
+            } catch (error) {
+              Alert.alert("Lỗi", "Không thể chụp ảnh");
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   return (
@@ -56,11 +138,24 @@ const ProfileInfoScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.avatarWrap}>
-          <Image
-            source={require("@/assets/images/1.png")}
-            style={styles.avatar}
-            resizeMode="cover"
-          />
+          <View style={styles.avatarContainer}>
+            <Image
+              source={
+                avatarUri
+                  ? { uri: avatarUri }
+                  : require("@/assets/images/1.png")
+              }
+              style={styles.avatar}
+              resizeMode="cover"
+            />
+            <TouchableOpacity
+              style={styles.editAvatarButton}
+              onPress={pickImage}
+              activeOpacity={0.8}
+            >
+              <PencilSimple size={scale(16)} color="#FFFFFF" weight="bold" />
+            </TouchableOpacity>
+          </View>
           <Text style={styles.name}>{fullName}</Text>
         </View>
 
@@ -181,11 +276,27 @@ const styles = StyleSheet.create({
     gap: spacingY._10,
     marginTop: spacingY._10,
   },
+  avatarContainer: {
+    position: "relative",
+  },
   avatar: {
     width: scale(90),
     height: scale(90),
     borderRadius: radius._30,
     backgroundColor: colors.Neutral300,
+  },
+  editAvatarButton: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: scale(28),
+    height: scale(28),
+    borderRadius: scale(14),
+    backgroundColor: colors.primary300,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: colors.Neutral200,
   },
   name: {
     color: "#FFFFFF",

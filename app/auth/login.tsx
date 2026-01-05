@@ -13,7 +13,8 @@ import {
 import { useRouter } from "expo-router";
 import { scale, verticalScale } from "@/utils/stylings";
 import { colors, spacingX, spacingY, radius } from "@/constants/theme";
-import { handleAuthLogin } from "../../service/authService";
+import { login } from "@/service/authService";
+import { storage } from "@/utils/storage";
 
 const LoginScreen = () => {
   const router = useRouter();
@@ -29,32 +30,35 @@ const LoginScreen = () => {
 
     setLoading(true);
     try {
-      // TODO: Thêm logic đăng nhập của bạn ở đây
-      // const result = await login(email, password);
-      // if (result.success) {
-      //   router.replace('/(tabs)' as any);
-      // }
       const userData = {
         email: email,
         password: password,
       };
-      const response = await handleAuthLogin(userData);
-      if (!response) {
-        alert("No response");
-        return;
-      } else if (response.status !== 200) {
-        alert(response.message);
-        setLoading(false);
-        return;
-      }
-      // Demo: delay 1.5s
-      setTimeout(() => {
+      const response = await login(userData);
+      
+      // Check if response has token
+      if (response && response.token) {
+        // Save token to storage
+        await storage.setToken(response.token);
+        
+        // Save user data if available
+        if (response.user) {
+          await storage.setUser(response.user);
+        }
+        
         setLoading(false);
         router.replace("/(tabs)" as any);
-      }, 1500);
-    } catch (error) {
+      } else if (response && response.status !== 200) {
+        alert(response.message || "Đăng nhập thất bại");
+        setLoading(false);
+      } else {
+        alert("Đăng nhập thất bại. Vui lòng thử lại.");
+        setLoading(false);
+      }
+    } catch (error: any) {
       setLoading(false);
-      alert("Đăng nhập thất bại");
+      const errorMessage = error?.message || error?.error || "Đăng nhập thất bại";
+      alert(errorMessage);
     }
   };
 

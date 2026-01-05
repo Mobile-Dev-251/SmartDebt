@@ -69,10 +69,6 @@ const StatisticScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Thống kê</Text>
-      </View>
-
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -191,18 +187,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.Neutral200,
-  },
-  header: {
-    height: spacingY._60,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: spacingX._20,
-  },
-  headerTitle: {
-    color: "#FFFFFF",
-    fontFamily: "RobotoBold",
-    fontSize: scale(22),
-    fontWeight: "800",
   },
   scroll: {
     flex: 1,

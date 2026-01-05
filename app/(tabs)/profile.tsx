@@ -71,7 +71,6 @@ const ProfileScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.pageTitle}>Thông tin cá nhân</Text>
       <View style={styles.header}>
         <Image
           source={require("@/assets/images/1.png")}
@@ -110,13 +109,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.Neutral200,
     paddingHorizontal: spacingX._20,
     paddingTop: spacingY._20,
-  },
-  pageTitle: {
-    color: "#FFFFFF",
-    fontFamily: "RobotoBold",
-    fontSize: scale(24),
-    textAlign: "center",
-    marginBottom: spacingY._15,
   },
   header: {
     alignItems: "center",
