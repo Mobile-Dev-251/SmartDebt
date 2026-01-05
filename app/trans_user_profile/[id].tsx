@@ -1,9 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-<<<<<<< Updated upstream
-import React, { useDebugValue, useEffect, useState } from 'react';
-=======
 import React, { useState, useEffect } from 'react';
->>>>>>> Stashed changes
 import {
   Dimensions,
   Image,
