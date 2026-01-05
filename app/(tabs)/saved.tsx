@@ -33,30 +33,10 @@ const SavedScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = () => {
-    const mockData: SectionData[] = [{
-        title: "A",
-        data: [
-          { id: '1', name: 'Antony'}
-        ]
-      },
-      {
-        title: "B",
-        data: [
-          { id: '2', name: 'Benjamin'}
-        ]
-      },
-      {
-        title: "N",
-        data: [
-          { id: '3', name: 'Nguyễn Văn A'},
-          { id: '4', name: 'Nguyễn Văn B'},
-          { id: '5', name: 'Nguyễn Văn C'},
-        ]
-      }];
-
-      setFullData(mockData);    
-      setDisplayData(mockData); 
-      setIsLoading(false);
+    // TODO: Replace with actual API call
+    setFullData([]);    
+    setDisplayData([]); 
+    setIsLoading(false);
   }
 
   useEffect(() => {

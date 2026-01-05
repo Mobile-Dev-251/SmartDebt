@@ -1,5 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+<<<<<<< Updated upstream
 import React, { useDebugValue, useEffect, useState } from 'react';
+=======
+import React, { useState, useEffect } from 'react';
+>>>>>>> Stashed changes
 import {
   Dimensions,
   Image,
@@ -22,40 +26,6 @@ import { RootState } from '@/store/store';
 
 const { width } = Dimensions.get('window');
 
-const transaction_list = [
-  {
-    title: "Ngày 7, tháng 11, năm 2025",
-    data: [
-      { id: '3', title: 'Tiền trà sữa', type: 'Mượn nợ', amount: '50.000đ', isDebt: true },
-    ],
-  },
-  {
-    title: "Ngày 5, tháng 11, năm 2025",
-    data: [
-      { id: '1', title: 'Tiền trà sữa', type: 'Mượn nợ', amount: '50.000đ', isDebt: true },
-      { id: '2', title: 'Tiền ăn trưa', type: 'Cho mượn', amount: '50.000đ', isDebt: false },
-    ],
-  },
-  {
-    title: "Ngày 3, tháng 11, năm 2025",
-    data: [
-      { id: '3', title: 'Tiền trà sữa', type: 'Mượn nợ', amount: '50.000đ', isDebt: true },
-    ],
-  },
-  {
-    title: "Ngày 2, tháng 11, năm 2025",
-    data: [
-      { id: '3', title: 'Tiền trà sữa', type: 'Mượn nợ', amount: '50.000đ', isDebt: true },
-    ],
-  },
-  {
-    title: "Ngày 1, tháng 11, năm 2025",
-    data: [
-      { id: '3', title: 'Tiền trà sữa', type: 'Mượn nợ', amount: '50.000đ', isDebt: true },
-    ],
-  },
-];
-
 const TransUserScreen = () => {
   const PAGE_ID = '[id]';
   const dispatch = useDispatch();
@@ -64,8 +34,14 @@ const TransUserScreen = () => {
   const [type, setType] = useState("unsaved");
   const [showMenu, setShowMenu] = useState(false);
   const [showGroupOption, setShowGroupOption] = useState(false);
+  const [transaction_list, setTransaction_list] = useState<any[]>([]);
   const router = useRouter();
   const { prevRoute } = useSelector((state: RootState) => state.progress)
+
+  useEffect(() => {
+    // TODO: Replace with actual API call to fetch transactions
+    setTransaction_list([]);
+  }, [item.id]);
 
   const details_choices = [
     { label: 'Hủy lưu', value: 'unsaved' }
@@ -187,7 +163,7 @@ const TransUserScreen = () => {
               source={{ uri: 'https://avatar.iran.liara.run/public/boy' }} 
               style={styles.largeAvatar} 
             />
-            <Text style={styles.profileName}>{item.name || "Hoàng Phương Bình"}</Text>
+            <Text style={styles.profileName}>{item.name || "Không có tên"}</Text>
             
             <TouchableOpacity style={styles.addBtn} onPress={() => {
               router.push({

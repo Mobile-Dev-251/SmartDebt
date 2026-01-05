@@ -40,42 +40,7 @@ type NotificationItem = {
   };
 };
 
-const notifications: NotificationItem[] = [
-  {
-    id: "1",
-    dateLabel: "Ngày 5, tháng 11, năm 2025",
-    content:
-      "Hoàng Phương Bình xác nhận đã trả 50.000đ cho bạn. Bấm để xác nhận",
-    payload: {
-      type: "Cho mượn",
-      typeValue: "lend",
-      name: "Hoàng Phương Bình",
-      note: "Xác nhận trả",
-      amount: "50.000đ",
-      borrowDate: "01/12/2025",
-      dueDate: "01/01/2026",
-      remind: "Trước 1 ngày (lặp lại)",
-      paidStatus: "pending",
-    },
-  },
-  {
-    id: "2",
-    dateLabel: "Ngày 3, tháng 11, năm 2025",
-    content:
-      "Bạn cần trả 50.000đ đã mượn của Hoàng Phương Bình vào ngày 1/11/2025. Bấm để xác nhận trả tiền",
-    payload: {
-      type: "Mượn nợ",
-      typeValue: "borrow",
-      name: "Hoàng Phương Bình",
-      note: "Thanh toán",
-      amount: "50.000đ",
-      borrowDate: "01/12/2025",
-      dueDate: "01/01/2026",
-      remind: "Trước 1 ngày (lặp lại)",
-      paidStatus: "unpaid",
-    },
-  },
-];
+// TODO: Replace with actual API call to fetch notifications
 
 const NotificationsScreen = () => {
   const router = useRouter();
@@ -83,8 +48,12 @@ const NotificationsScreen = () => {
   const [permissionStatus, setPermissionStatus] = useState<string>("Đang kiểm tra...");
   const [isLoading, setIsLoading] = useState(false);
   const [notificationReceived, setNotificationReceived] = useState<any>(null);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
   useEffect(() => {
+    // TODO: Fetch notifications from API
+    setNotifications([]);
+    
     // Kiểm tra quyền thông báo
     checkPermissions();
 

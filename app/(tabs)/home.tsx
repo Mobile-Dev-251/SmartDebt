@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   SafeAreaView,
   View,
@@ -10,10 +10,12 @@ import {
 } from "react-native";
 import { BellSimple, QrCode, Plus } from "phosphor-react-native";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { colors, spacingX, spacingY, radius } from "@/constants/theme";
 import { scale } from "@/utils/stylings";
-import { setCurrentRoute } from '@/store/progress';
-import { useDispatch } from 'react-redux';
+import { storage } from "@/utils/storage";
+import { getMyProfile } from "@/service/userService";
+import { getAllDebts } from "@/service/debtsService";
 
 type Transaction = {
   id: string;
@@ -30,45 +32,6 @@ type Transaction = {
   totalCount?: number;
 };
 
-const transactions: Transaction[] = [
-  {
-    id: "1",
-    name: "Hoàng Phương Bình",
-    note: "Tiền ăn trưa",
-    type: "lend",
-    amount: 50000,
-    borrowDate: "01/12/2025",
-    dueDate: "01/01/2026",
-    remind: "Trước 1 ngày (lặp lại)",
-    paidStatus: "unpaid",
-  },
-  {
-    id: "2",
-    name: "Hoàng Phương Bình",
-    note: "Tiền trả sữa",
-    type: "borrow",
-    amount: 50000,
-    borrowDate: "01/12/2025",
-    dueDate: "01/01/2026",
-    remind: "Trước 1 ngày (lặp lại)",
-    paidStatus: "unpaid",
-  },
-  {
-    id: "3",
-    name: "Hoàng Phương Bình",
-    note: "Du lịch Đà Lạt",
-    type: "group",
-    group: "Hội bạn du lịch",
-    amount: 2000000,
-    borrowDate: "01/12/2025",
-    dueDate: "01/01/2026",
-    remind: "Trước 1 ngày (lặp lại)",
-    paidStatus: "unpaid",
-    paidCount: 1,
-    totalCount: 5,
-  },
-];
-
 const formatCurrency = (value: number) =>
   `${value.toLocaleString("vi-VN")}đ`;
 
@@ -76,6 +39,118 @@ const HomeScreen = () => {
   const PAGE_ID = 'home';
   const dispatch = useDispatch();
   const router = useRouter();
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [userName, setUserName] = useState<string>("");
+  const [totalMonth, setTotalMonth] = useState<number>(0);
+  const [totalLend, setTotalLend] = useState<number>(0);
+  const [totalBorrow, setTotalBorrow] = useState<number>(0);
+  const [loadingSummary, setLoadingSummary] = useState<boolean>(true);
+
+  const loadData = useCallback(async () => {
+    setLoadingSummary(true);
+    try {
+      // 1. Lấy thông tin user để hiển thị tên
+      let currentUserId: number | null = null;
+      let nameFromStorage = "";
+
+      const storedUser = await storage.getUser();
+      if (storedUser) {
+        nameFromStorage =
+          storedUser.full_name || storedUser.name || storedUser.email || "";
+        if (storedUser.id) {
+          currentUserId = storedUser.id;
+        }
+      }
+
+      // Nếu chưa có tên hoặc id, thử gọi API profile
+      if (!nameFromStorage || currentUserId == null) {
+        try {
+          const profileRes: any = await getMyProfile();
+          const profileData = Array.isArray(profileRes?.profile)
+            ? profileRes.profile[0]
+            : profileRes?.profile;
+
+          if (profileData) {
+            if (!nameFromStorage) {
+              nameFromStorage =
+                profileData.full_name ||
+                profileData.name ||
+                profileData.email ||
+                "";
+            }
+            if (currentUserId == null && profileData.id) {
+              currentUserId = profileData.id;
+            }
+          }
+        } catch (e) {
+          console.warn("Không thể lấy profile từ backend:", e);
+        }
+      }
+
+      if (nameFromStorage) {
+        setUserName(nameFromStorage);
+      }
+
+      // 2. Lấy danh sách debts để tính chi tiêu tháng này
+      try {
+        const debts: any[] = await getAllDebts();
+
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+
+        let monthLend = 0;
+        let monthBorrow = 0;
+
+        if (Array.isArray(debts)) {
+          debts.forEach((debt: any) => {
+            const amount = Number(debt.amount || 0);
+            const dueDate = debt.due_date ? new Date(debt.due_date) : null;
+
+            if (
+              dueDate &&
+              dueDate.getMonth() === currentMonth &&
+              dueDate.getFullYear() === currentYear
+            ) {
+              // Xác định chiều nợ dựa vào lender_id / borrower_id
+              if (currentUserId != null && debt.lender_id === currentUserId) {
+                monthLend += amount;
+              } else if (
+                currentUserId != null &&
+                debt.borrower_id === currentUserId
+              ) {
+                monthBorrow += amount;
+              } else {
+                // Nếu không xác định được, coi như mượn nợ
+                monthBorrow += amount;
+              }
+            }
+          });
+        }
+
+        setTotalLend(monthLend);
+        setTotalBorrow(monthBorrow);
+        // Chi tiêu tháng này: tạm thời tính là tổng số tiền mà user phải trả (mượn)
+        setTotalMonth(monthBorrow);
+      } catch (e) {
+        console.warn("Không thể lấy dữ liệu debts:", e);
+        setTotalLend(0);
+        setTotalBorrow(0);
+        setTotalMonth(0);
+      }
+
+      // 3. (Hiện tại) chưa hiển thị danh sách giao dịch từ backend nên để rỗng
+      setTransactions([]);
+    } finally {
+      setLoadingSummary(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -92,7 +167,9 @@ const HomeScreen = () => {
               resizeMode="cover"
             />
             <View>
-              <Text style={styles.profileName}>Hoàng Phương Bình</Text>
+              <Text style={styles.profileName}>
+                {userName || "SmartDebt User"}
+              </Text>
             </View>
           </View>
 
@@ -112,19 +189,21 @@ const HomeScreen = () => {
 
         <View style={styles.summaryCard}>
           <Text style={styles.cardLabel}>Chi tiêu tháng này:</Text>
-          <Text style={styles.cardValue}>2.000.000 đ</Text>
+          <Text style={styles.cardValue}>
+            {loadingSummary ? "..." : formatCurrency(totalMonth)}
+          </Text>
 
           <View style={styles.cardRow}>
             <View style={styles.cardColumn}>
               <Text style={styles.cardSmallLabel}>Cho mượn:</Text>
               <Text style={[styles.cardSmallValue, styles.lendColor]}>
-                {formatCurrency(3000000)}
+                {loadingSummary ? "..." : formatCurrency(totalLend)}
               </Text>
             </View>
             <View style={styles.cardColumn}>
               <Text style={styles.cardSmallLabel}>Mượn:</Text>
               <Text style={[styles.cardSmallValue, styles.borrowColor]}>
-                {formatCurrency(1000000)}
+                {loadingSummary ? "..." : formatCurrency(totalBorrow)}
               </Text>
             </View>
           </View>

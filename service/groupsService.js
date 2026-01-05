@@ -64,3 +64,4 @@ export const getGroupHistoryExpenses = async (groupId) => {
   return axios.get(`/groups/${groupId}/history-expenses`);
 };
 
+

@@ -46,37 +46,10 @@ const selectScreen = () => {
   const [sections, setSections] = useState<SectionData[]>([]);
 
   useEffect(() => {
-    dispatch(setCurrentRoute({pageId: PAGE_ID}));
-  }, [])
-
-  // Mock fetch
-  useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
-      if (addType === 'group') {
-        const data: SectionData[] = [
-          {
-            title: 'Nhóm của bạn',
-            data: [
-              { id: 'g1', name: 'Hội bạn du lịch', note: 'Chia sẻ các khoản chi phí du lịch' },
-              { id: 'g2', name: 'Anh em đá banh', note: 'Share tiền đá banh' }
-            ]
-          }
-        ];
-        setSections(data);
-      } else {
-        const data: SectionData[] = [
-          {
-            title: 'Gợi ý',
-            data: [
-              { id: '1', name: 'Antony' },
-              { id: '2', name: 'Benjamin' },
-              { id: '3', name: 'Nguyễn Văn A' }
-            ]
-          }
-        ];
-        setSections(data);
-      }
+      // TODO: Replace with actual API call
+      setSections([]);
       setIsLoading(false);
     }
     fetchData();

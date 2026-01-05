@@ -32,36 +32,15 @@ const CreateGroupScreen = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]); // Selected list
 
   useEffect(() => {
-    dispatch(setCurrentRoute({ pageId: PAGE_ID }));
-
-    // Fetch saved users for the current user (mocked here)
     const fetchSavedUsers = async () => {
       if (!userId) {
         setIsLoading(false);
         return;
       }
 
-      try {
-        setIsLoading(true);
-      
-        // Call API
-        const mock: SectionData[] = [
-          {
-            title: 'Đã lưu',
-            data: [
-              { id: '1', name: 'Antony' },
-              { id: '2', name: 'Hoàng Phương Bình' },
-              { id: '3', name: 'Nguyễn Văn A' },
-            ],
-          },
-        ];
-
-        setSections(mock);
-      } catch (error) {
-        console.error("Lỗi khi lấy danh sách bạn bè:", error);
-      } finally {
-        setIsLoading(false);
-      }
+      // TODO: Replace with actual API call
+      setSections([]);
+      setIsLoading(false);
     };
 
     fetchSavedUsers();

@@ -10,3 +10,4 @@ export * from "./categoriesService";
 // Export axios instance for custom requests
 export { default as api } from "./axios";
 
+

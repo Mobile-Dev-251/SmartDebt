@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   SafeAreaView,
   View,
@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Image,
   TouchableOpacity,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { colors, spacingX, spacingY, radius } from "@/constants/theme";
@@ -17,8 +18,9 @@ import {
   HeartStraight,
   SignOut,
 } from "phosphor-react-native";
-import { useDispatch } from "react-redux";
-import { logOut } from "@/store/auth";
+import { getMyProfile } from "@/service/userService";
+import { storage } from "@/utils/storage";
+import { useFocusEffect } from "@react-navigation/native";
 
 type MenuItem = {
   id: string;
@@ -30,7 +32,57 @@ type MenuItem = {
 
 const ProfileScreen = () => {
   const router = useRouter();
-  const dispatch = useDispatch();
+  const [userName, setUserName] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const loadProfile = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Try to get from storage first
+      const storedUser = await storage.getUser();
+      if (storedUser) {
+        setUserName(storedUser.full_name || storedUser.name || "");
+        if (storedUser.avatar_url) {
+          setAvatarUrl(storedUser.avatar_url);
+        }
+      }
+
+      // Fetch from API
+      const response = await getMyProfile();
+      if (response && response.profile && response.profile.length > 0) {
+        const profile = response.profile[0];
+        setUserName(profile.name || "");
+        if (profile.avatar_url) {
+          setAvatarUrl(profile.avatar_url);
+        }
+        // Update storage
+        await storage.setUser({
+          ...storedUser,
+          full_name: profile.name,
+          name: profile.name,
+          avatar_url: profile.avatar_url,
+        });
+      }
+    } catch (error: any) {
+      console.error("Error loading profile:", error);
+      // Fallback to stored user or default
+      const storedUser = await storage.getUser();
+      if (storedUser) {
+        setUserName(storedUser.full_name || storedUser.name || "SmartDebt User");
+      } else {
+        setUserName("SmartDebt User");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadProfile();
+    }, [loadProfile])
+  );
 
   const menu: MenuItem[] = [
     {
@@ -80,12 +132,22 @@ const ProfileScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Image
-          source={require("@/assets/images/1.png")}
-          style={styles.avatar}
-          resizeMode="cover"
-        />
-        <Text style={styles.name}>Hoàng Phương Bình</Text>
+        {isLoading ? (
+          <ActivityIndicator size="large" color={colors.primary300} />
+        ) : (
+          <>
+            <Image
+              source={
+                avatarUrl
+                  ? { uri: avatarUrl }
+                  : require("@/assets/images/avatar.png")
+              }
+              style={styles.avatar}
+              resizeMode="cover"
+            />
+            <Text style={styles.name}>{userName || "SmartDebt User"}</Text>
+          </>
+        )}
       </View>
 
       <View style={styles.menu}>

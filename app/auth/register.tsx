@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'; // SỬA: Import useRef
+import React, { useState, useRef } from 'react';
 import {
   SafeAreaView,
   View,
@@ -8,32 +8,37 @@ import {
   StyleSheet,
   StatusBar,
   ActivityIndicator,
-  ScrollView,           // THÊM: Để cuộn được
-  KeyboardAvoidingView, // THÊM: Để tránh bàn phím
-  Platform,             // THÊM: Để check hệ điều hành
-  Keyboard              // THÊM: Để ẩn bàn phím thủ công nếu cần
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { scale } from '@/utils/stylings';
 import { colors, spacingX, spacingY, radius } from '@/constants/theme';
+import { register } from '@/service/authService';
 
 const RegisterScreen = () => {
   const router = useRouter();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState(''); // [MỚI]: State cho số điện thoại
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // THÊM: Tạo ref để điều khiển việc nhảy ô nhập liệu
+  // Refs điều khiển focus
   const emailRef = useRef<TextInput>(null);
+  const phoneRef = useRef<TextInput>(null); // [MỚI]: Ref cho ô Phone
   const passwordRef = useRef<TextInput>(null);
   const confirmPasswordRef = useRef<TextInput>(null);
 
   const handleRegister = async () => {
-    Keyboard.dismiss(); // Ẩn bàn phím khi bấm đăng ký
-    if (!name || !email || !password || !confirmPassword) {
+    Keyboard.dismiss();
+    
+    // [MỚI]: Thêm check phone
+    if (!name || !email || !phone || !password || !confirmPassword) {
       alert('Vui lòng nhập đầy đủ thông tin.');
       return;
     }
@@ -46,14 +51,28 @@ const RegisterScreen = () => {
     setLoading(true);
 
     try {
-      setTimeout(() => {
+      const userData = {
+        full_name: name,
+        email: email,
+        phone: phone, // [MỚI]: Gửi số điện thoại thực tế
+        password: password,
+      };
+      
+      const response = await register(userData);
+      
+      if (response && (response.status === 200 || response.status === 201 || response.message)) {
         setLoading(false);
         alert('Đăng ký thành công!');
         router.replace('/auth/login' as any);
-      }, 1500);
-    } catch (error) {
+      } else {
+        setLoading(false);
+        alert(response?.message || 'Đăng ký thất bại');
+      }
+    } catch (error: any) {
       setLoading(false);
-      alert('Đăng ký thất bại');
+      const errorMessage = error?.message || error?.error || 'Đăng ký thất bại';
+      alert(errorMessage);
+      console.error('Register error:', error);
     }
   };
 
@@ -66,23 +85,16 @@ const RegisterScreen = () => {
       <StatusBar barStyle="light-content" backgroundColor={colors.Neutral300} />
 
       <SafeAreaView style={styles.container}>
-        {/* THÊM: KeyboardAvoidingView giúp đẩy giao diện lên khi bàn phím hiện 
-           Behavior 'padding' tốt cho iOS, 'height' tốt cho Android
-        */}
         <KeyboardAvoidingView 
           style={{ flex: 1 }} 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          {/* THÊM: ScrollView để người dùng có thể lướt lên xuống 
-             keyboardShouldPersistTaps="handled" giúp bấm nút Đăng ký được ngay mà ko cần ẩn phím trước
-          */}
           <ScrollView 
             contentContainerStyle={styles.scrollContent} 
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
             
-            {/* Header */}
             <View style={styles.header}>
               <Text style={styles.logo}>SMART DEBT</Text>
             </View>
@@ -100,17 +112,17 @@ const RegisterScreen = () => {
                   value={name}
                   onChangeText={setName}
                   editable={!loading}
-                  returnKeyType="next" // Đổi nút enter thành nút Next
-                  onSubmitEditing={() => emailRef.current?.focus()} // Nhảy sang ô Email
+                  returnKeyType="next"
+                  onSubmitEditing={() => emailRef.current?.focus()}
                   blurOnSubmit={false}
                 />
               </View>
 
-              {/* Email */}
+              {/* Email Input */}
               <View style={styles.inputContainer}>
                 <Text style={styles.icon}></Text>
                 <TextInput
-                  ref={emailRef} // Gắn Ref
+                  ref={emailRef}
                   style={styles.input}
                   placeholder="Nhập email"
                   placeholderTextColor={colors.Neutral100}
@@ -120,16 +132,36 @@ const RegisterScreen = () => {
                   autoCapitalize="none"
                   editable={!loading}
                   returnKeyType="next"
-                  onSubmitEditing={() => passwordRef.current?.focus()} // Nhảy sang Password
+                  // [MỚI]: Sửa logic focus, từ Email nhảy sang Phone
+                  onSubmitEditing={() => phoneRef.current?.focus()} 
                   blurOnSubmit={false}
                 />
               </View>
 
-              {/* Password */}
+              {/* [MỚI]: Phone Input */}
               <View style={styles.inputContainer}>
                 <Text style={styles.icon}></Text>
                 <TextInput
-                  ref={passwordRef} // Gắn Ref
+                  ref={phoneRef} // Gắn Ref
+                  style={styles.input}
+                  placeholder="Nhập số điện thoại"
+                  placeholderTextColor={colors.Neutral100}
+                  value={phone}
+                  onChangeText={setPhone}
+                  keyboardType="phone-pad" // Bàn phím số cho điện thoại
+                  editable={!loading}
+                  returnKeyType="next"
+                  // Từ Phone nhảy sang Password
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                  blurOnSubmit={false}
+                />
+              </View>
+
+              {/* Password Input */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.icon}></Text>
+                <TextInput
+                  ref={passwordRef}
                   style={styles.input}
                   placeholder="Nhập mật khẩu"
                   placeholderTextColor={colors.Neutral100}
@@ -138,16 +170,16 @@ const RegisterScreen = () => {
                   onChangeText={setPassword}
                   editable={!loading}
                   returnKeyType="next"
-                  onSubmitEditing={() => confirmPasswordRef.current?.focus()} // Nhảy sang Confirm
+                  onSubmitEditing={() => confirmPasswordRef.current?.focus()}
                   blurOnSubmit={false}
                 />
               </View>
 
-              {/* Confirm password */}
+              {/* Confirm Password Input */}
               <View style={styles.inputContainer}>
                 <Text style={styles.icon}></Text>
                 <TextInput
-                  ref={confirmPasswordRef} // Gắn Ref
+                  ref={confirmPasswordRef}
                   style={styles.input}
                   placeholder="Xác nhận mật khẩu"
                   placeholderTextColor={colors.Neutral100}
@@ -155,8 +187,8 @@ const RegisterScreen = () => {
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   editable={!loading}
-                  returnKeyType="done" // Nút cuối cùng là Done
-                  onSubmitEditing={handleRegister} // Bấm xong thì gọi hàm Đăng ký luôn
+                  returnKeyType="done"
+                  onSubmitEditing={handleRegister}
                 />
               </View>
 
@@ -183,7 +215,6 @@ const RegisterScreen = () => {
               </View>
             </View>
 
-            {/* View đệm dưới cùng để khi bàn phím hiện lên vẫn có khoảng trống */}
             <View style={{ height: spacingY._40 }} /> 
 
           </ScrollView>
@@ -193,19 +224,20 @@ const RegisterScreen = () => {
   );
 };
 
+// Styles giữ nguyên không thay đổi
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.Neutral300,
   },
   scrollContent: {
-    flexGrow: 1, // Quan trọng để ScrollView hoạt động đúng
+    flexGrow: 1,
     paddingHorizontal: spacingX._20,
-    paddingBottom: spacingY._40, // Căn giữa nội dung nếu màn hình dài
+    paddingBottom: spacingY._40,
   },
   header: {
     alignItems: 'center',
-    marginTop: spacingY._40, // Sửa padding thành margin cho thoáng
+    marginTop: spacingY._40,
     marginBottom: spacingY._40,
   },
   logo: {
@@ -274,7 +306,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     marginTop: spacingY._10,
-    paddingBottom: spacingY._20, // Thêm padding bottom nhẹ
+    paddingBottom: spacingY._20,
   },
   registerText: {
     fontSize: scale(14),

@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "smartdebt",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
@@ -70,7 +69,10 @@
           "project": "react-native",
           "organization": "ho-chi-minh-university"
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker",
+      "@sentry/react-native",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

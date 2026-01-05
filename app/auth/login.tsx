@@ -53,29 +53,35 @@ const LoginScreen = () => {
       /*DEBUG SESSION*/
       const response = await login(userData);
       
-      // Check if response has token
-      if (response && response.token) {
-        // Save token to storage
-        await storage.setToken(response.token);
+      console.log('Login response:', response);
+      
+      // Backend trả về: { status: 200, message: "...", data: { user: {...}, accessToken: "...", refreshToken: "..." } }
+      if (response && response.status === 200 && response.data) {
+        // Save accessToken to storage
+        if (response.data.accessToken) {
+          await storage.setToken(response.data.accessToken);
+        }
         
         // Save user data if available
-        if (response.user) {
-          await storage.setUser(response.user);
+        if (response.data.user) {
+          await storage.setUser(response.data.user);
         }
         
         setLoading(false);
-        router.replace("/(tabs)" as any);
+        alert(response.message || "Đăng nhập thành công!");
+        router.replace("/(tabs)/home" as any);
       } else if (response && response.status !== 200) {
         alert(response.message || "Đăng nhập thất bại");
         setLoading(false);
       } else {
-        alert("Đăng nhập thất bại. Vui lòng thử lại.");
+        alert(response?.message || "Đăng nhập thất bại. Vui lòng thử lại.");
         setLoading(false);
       }
       } // REMEMBER TO REMOVE THIS BRACKET
     } catch (error: any) {
       setLoading(false);
-      const errorMessage = error?.message || error?.error || "Đăng nhập thất bại";
+      console.error('Login error:', error);
+      const errorMessage = error?.message || error?.error || error?.data?.message || "Đăng nhập thất bại";
       alert(errorMessage);
     }
   };

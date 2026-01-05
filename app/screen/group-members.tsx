@@ -55,19 +55,8 @@ const GroupMembersScreen = () => {
       // expected data shape: [{ id, name, lastTransaction? }, ...]
       setSections([{ title: 'Thành viên', data }]);
     } catch (err) {
-      // Fallback to mock data if backend not available
-      const mock: SectionData[] = [
-        {
-          title: 'Thành viên',
-          data: [
-            { id: '1', name: 'Antony', lastTransaction: 'Giao dịch gần đây' },
-            { id: '2', name: 'Benjamin', lastTransaction: 'Giao dịch gần đây' },
-            { id: '3', name: 'Nguyễn Văn A', lastTransaction: 'Giao dịch gần đây' },
-          ],
-        },
-      ];
-      setSections(mock);
-      // optional: setError('Không thể tải dữ liệu. Hiển thị dữ liệu mẫu.');
+      setError('Không thể tải dữ liệu thành viên.');
+      setSections([]);
     } finally {
       setIsLoading(false);
     }

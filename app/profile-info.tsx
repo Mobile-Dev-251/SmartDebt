@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
   View,
@@ -10,6 +10,7 @@ import {
   ScrollView,
   Alert,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -21,16 +22,21 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import * as ImagePicker from "expo-image-picker";
 import { colors, spacingX, spacingY, radius } from "@/constants/theme";
 import { scale } from "@/utils/stylings";
+import { getMyProfile, updateProfile } from "@/service/userService";
+import { storage } from "@/utils/storage";
 
 const ProfileInfoScreen = () => {
   const router = useRouter();
-  const [fullName, setFullName] = useState("Hoàng Phương Bình");
-  const [phone, setPhone] = useState("0123456789");
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [gender, setGender] = useState<"Nam" | "Nữ" | "Khác">("Nam");
   const [showGender, setShowGender] = useState(false);
   const [birth, setBirth] = useState("01/01/2004");
   const [showBirth, setShowBirth] = useState(false);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const formatDate = (d: Date) => {
     const dd = String(d.getDate()).padStart(2, "0");
@@ -42,6 +48,98 @@ const ProfileInfoScreen = () => {
   const parseDate = (value: string) => {
     const [dd, mm, yyyy] = value.split("/").map((p) => parseInt(p, 10));
     return new Date(yyyy, mm - 1, dd);
+  };
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    setIsLoading(true);
+    try {
+      // Try to get from storage first
+      const storedUser = await storage.getUser();
+      if (storedUser) {
+        setFullName(storedUser.full_name || storedUser.name || "");
+        setPhone(storedUser.phone || "");
+        setEmail(storedUser.email || "");
+        if (storedUser.avatar_url) {
+          setAvatarUri(storedUser.avatar_url);
+        }
+      }
+
+      // Fetch from API
+      const response = await getMyProfile();
+      if (response && response.profile && response.profile.length > 0) {
+        const profile = response.profile[0];
+        setFullName(profile.name || "");
+        setPhone(profile.phone || "");
+        setEmail(profile.email || "");
+        if (profile.avatar_url) {
+          setAvatarUri(profile.avatar_url);
+        }
+        // Update storage
+        await storage.setUser({
+          ...storedUser,
+          full_name: profile.name,
+          name: profile.name,
+          phone: profile.phone,
+          email: profile.email,
+          avatar_url: profile.avatar_url,
+        });
+      }
+    } catch (error: any) {
+      console.error("Error loading profile:", error);
+      Alert.alert("Lỗi", "Không thể tải thông tin cá nhân");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdate = async () => {
+    if (!fullName.trim()) {
+      Alert.alert("Lỗi", "Vui lòng nhập họ và tên");
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      const updateData: any = {
+        name: fullName.trim(),
+      };
+
+      if (phone.trim()) {
+        updateData.phone = phone.trim();
+      }
+
+      if (avatarUri) {
+        updateData.avatar_url = avatarUri;
+      }
+
+      const response = await updateProfile(updateData);
+      
+      if (response && response.status === 200) {
+        // Update storage
+        const storedUser = await storage.getUser();
+        await storage.setUser({
+          ...storedUser,
+          full_name: response.profile.name,
+          name: response.profile.name,
+          phone: response.profile.phone,
+          avatar_url: response.profile.avatar_url,
+        });
+        
+        Alert.alert("Thành công", response.message || "Cập nhật thông tin thành công");
+        router.back();
+      } else {
+        Alert.alert("Lỗi", response?.message || "Không thể cập nhật thông tin");
+      }
+    } catch (error: any) {
+      console.error("Error updating profile:", error);
+      Alert.alert("Lỗi", error?.message || "Không thể cập nhật thông tin");
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const requestImagePickerPermission = async () => {
@@ -122,6 +220,23 @@ const ProfileInfoScreen = () => {
     );
   };
 
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
+            <ArrowLeft size={scale(22)} color="#FFFFFF" weight="bold" />
+          </TouchableOpacity>
+          <Text style={styles.title}>Thông tin cá nhân</Text>
+          <View style={{ width: scale(22) }} />
+        </View>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator size="large" color={colors.primary300} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -143,7 +258,7 @@ const ProfileInfoScreen = () => {
               source={
                 avatarUri
                   ? { uri: avatarUri }
-                  : require("@/assets/images/1.png")
+                  : require("@/assets/images/avatar.png")
               }
               style={styles.avatar}
               resizeMode="cover"
@@ -171,6 +286,17 @@ const ProfileInfoScreen = () => {
         </View>
 
         <View style={styles.field}>
+          <Text style={styles.label}>Email</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: colors.Neutral400, color: colors.Neutral100 }]}
+            value={email}
+            editable={false}
+            placeholder="Email (không thể thay đổi)"
+            placeholderTextColor={colors.Neutral100}
+          />
+        </View>
+
+        <View style={styles.field}>
           <Text style={styles.label}>Số điện thoại</Text>
           <TextInput
             style={styles.input}
@@ -178,6 +304,7 @@ const ProfileInfoScreen = () => {
             onChangeText={setPhone}
             placeholder="Nhập số điện thoại"
             placeholderTextColor={colors.Neutral100}
+            keyboardType="phone-pad"
           />
         </View>
 
@@ -237,9 +364,20 @@ const ProfileInfoScreen = () => {
           )}
         </View>
 
-        <TouchableOpacity style={styles.editBtn} activeOpacity={0.9}>
-          <PencilSimple size={scale(16)} color="#FFFFFF" weight="bold" />
-          <Text style={styles.editText}>Cập nhật</Text>
+        <TouchableOpacity 
+          style={[styles.editBtn, isUpdating && styles.editBtnDisabled]} 
+          activeOpacity={0.9}
+          onPress={handleUpdate}
+          disabled={isUpdating}
+        >
+          {isUpdating ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <>
+              <PencilSimple size={scale(16)} color="#FFFFFF" weight="bold" />
+              <Text style={styles.editText}>Cập nhật</Text>
+            </>
+          )}
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -375,6 +513,9 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontFamily: "RobotoBold",
     fontSize: scale(14),
+  },
+  editBtnDisabled: {
+    opacity: 0.6,
   },
 });
 

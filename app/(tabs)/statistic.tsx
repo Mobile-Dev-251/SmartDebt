@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
   View,
@@ -24,35 +24,24 @@ type PersonDebt = {
   outstandingDebt: number;
 };
 
-// Dữ liệu mẫu cho biểu đồ
-const monthlyData: MonthlyData[] = [
-  { month: "Tháng 6", value: 200, color: "#FF6B6B" },
-  { month: "Tháng 7", value: 350, color: "#FFA500" },
-  { month: "Tháng 8", value: 280, color: "#FFD700" },
-  { month: "Tháng 9", value: 450, color: "#32CD32" },
-  { month: "Tháng 10", value: 600, color: "#4169E1" },
-  { month: "Tháng 11", value: 332, color: "#9370DB" },
-];
-
-// Dữ liệu mẫu cho người vay (Mượn nợ)
-const borrowersData: PersonDebt[] = [
-  { id: "1", name: "Hoàng Phương Bình", outstandingDebt: 172000 },
-  { id: "2", name: "Nguyễn Kiều Chi", outstandingDebt: 20000 },
-  { id: "3", name: "Phạm Nhật Kha", outstandingDebt: 140000 },
-];
-
-// Dữ liệu mẫu cho người cho vay (Khoản nợ)
-const lendersData: PersonDebt[] = [
-  { id: "1", name: "Hoàng Phương Bình", outstandingDebt: 172000 },
-  { id: "2", name: "Nguyễn Kiều Chi", outstandingDebt: 20000 },
-  { id: "3", name: "Phạm Hoàng Khang", outstandingDebt: 140000 },
-];
+// TODO: Replace with actual API calls to fetch data
 
 const formatCurrency = (value: number) =>
   `${value.toLocaleString("vi-VN")}đ`;
 
 const StatisticScreen = () => {
   const [activeTab, setActiveTab] = useState<TabType>("borrow");
+  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
+  const [borrowersData, setBorrowersData] = useState<PersonDebt[]>([]);
+  const [lendersData, setLendersData] = useState<PersonDebt[]>([]);
+
+  // TODO: Fetch data from API
+  useEffect(() => {
+    // Replace with actual API calls
+    setMonthlyData([]);
+    setBorrowersData([]);
+    setLendersData([]);
+  }, []);
 
   // Tính tổng số tiền
   const totalAmount =
@@ -65,7 +54,7 @@ const StatisticScreen = () => {
     activeTab === "borrow" ? borrowersData : lendersData;
 
   // Tìm giá trị lớn nhất trong biểu đồ để tính tỷ lệ
-  const maxValue = Math.max(...monthlyData.map((d) => d.value));
+  const maxValue = monthlyData.length > 0 ? Math.max(...monthlyData.map((d) => d.value)) : 0;
 
   return (
     <SafeAreaView style={styles.container}>

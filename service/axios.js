@@ -14,7 +14,7 @@ const getHostIP = () => {
 const IP = getHostIP();
 
 // Use environment variable or fallback to local IP
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || `http://${IP}:3000`;
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || `http://wrongurl:3000`;
 
 const instance = axios.create({
   baseURL: BASE_URL,

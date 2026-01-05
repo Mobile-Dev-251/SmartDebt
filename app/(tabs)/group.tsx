@@ -32,17 +32,9 @@ const GroupScreen = () => {
   const userId = auth.user;
 
   const fetchData = () => {
-    const mockData: SectionData[] = [
-      {
-        title: "Nhóm của bạn",
-        data: [
-          { id: '1', name: 'Hội bạn du lịch', note: 'Chia sẻ các khoản chi phí du lịch'},
-          { id: '2', name: 'Anh em đá banh', note: 'Share tiền đá banh'},
-        ]
-      }
-    ];
-    setFullData(mockData);   
-    setDisplayData(mockData); 
+    // TODO: Replace with actual API call
+    setFullData([]);   
+    setDisplayData([]); 
     setIsLoading(false);
   }
 

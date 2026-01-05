@@ -45,3 +45,4 @@ export const deleteCategory = async (id) => {
   return axios.delete(`/categories/${id}`);
 };
 
+

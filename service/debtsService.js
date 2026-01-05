@@ -36,3 +36,4 @@ export const deleteDebt = async (id) => {
   return axios.delete(`/debts/${id}`);
 };
 
+

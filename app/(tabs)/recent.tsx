@@ -20,37 +20,9 @@ const RecentScreen = () => {
   const [isLoading, setIsLoading] = useState(true)
 
   const fetchData = () => {
-    const mockData: SectionData[] = [{
-        title: "Ngày 5, tháng 11, năm 2025",
-        data: [
-          { id: '1', name: 'Hoàng Phương Bình', note: 'Tiền trà sữa', amount: '50.000đ', type: 'borrow' }, 
-          { id: '2', name: 'Hoàng Phương Bình', note: 'Tiền ăn trưa', amount: '50.000đ', type: 'lend' },   
-        ]
-      },
-      {
-        title: "Ngày 3, tháng 11, năm 2025",
-        data: [
-          { id: '3', name: 'Hoàng Phương Bình', note: 'Tiền trà sữa', amount: '50.000đ', type: 'borrow' },
-          { id: '4', name: 'Hoàng Phương Bình', note: 'Tiền ăn trưa', amount: '50.000đ', type: 'lend' },
-        ]
-      },
-      {
-        title: "Ngày 2, tháng 11, năm 2025",
-        data: [
-          { id: '3', name: 'Hoàng Phương Bình', note: 'Tiền trà sữa', amount: '50.000đ', type: 'borrow' },
-          { id: '4', name: 'Hoàng Phương Bình', note: 'Tiền ăn trưa', amount: '50.000đ', type: 'lend' },
-        ]
-      },
-      {
-        title: "Ngày 1, tháng 11, năm 2025",
-        data: [
-          { id: '3', name: 'Hoàng Phương Bình', note: 'Tiền trà sữa', amount: '50.000đ', type: 'borrow' },
-          { id: '4', name: 'Hoàng Phương Bình', note: 'Tiền ăn trưa', amount: '50.000đ', type: 'lend' },
-        ]
-      }];
-
-      setListByDay(mockData);
-      setIsLoading(false);
+    // TODO: Replace with actual API call
+    setListByDay([]);
+    setIsLoading(false);
   }
 
   useEffect(() => {

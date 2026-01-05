@@ -45,3 +45,4 @@ export const deleteExpense = async (id) => {
   return axios.delete(`/expenses/${id}`);
 };
 
+
