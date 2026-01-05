@@ -5,10 +5,26 @@ import { Tabs } from 'expo-router';
 import Entypo from '@expo/vector-icons/Entypo';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
+import { useDispatch } from 'react-redux';
+import { setCurrentRoute } from '@/store/progress';
 
 const TabsLayout = () => {
+  const dispatch = useDispatch();
+  // const initialTab = tab === 'saved' ? "Đã lưu" : 
+  //                   tab === 'group' ? "Nhóm" : 
+  //                   "Gần đây";
+
   return (
     <Tabs
+    screenListeners={{
+      state: (e) => {
+        const state = e.data.state;
+        const currentTabName = state.routes[state.index].name;
+        
+        // console.log(currentTabName)
+        dispatch(setCurrentRoute({ pageId: currentTabName }));
+      },
+    }}
       screenOptions={{
         headerShown: true,
         headerTitleAlign:'center',

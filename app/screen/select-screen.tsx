@@ -19,6 +19,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SearchContext } from '../(tabs)/transaction';
+import { useDispatch } from 'react-redux';
+import { setCurrentRoute } from '@/store/progress';
 
 interface InfoItem {
   id: string,
@@ -34,12 +36,18 @@ interface SectionData {
 const avatar_width = Dimensions.get('window').width * 0.1159;
 
 const selectScreen = () => {
+  const PAGE_ID = 'select-screen';
+  const dispatch = useDispatch();
   const router = useRouter();
   const params = useLocalSearchParams<{ type?: string }>();
   const addType = (params.type as string) || 'user';
   const [searchText, setSearchText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [sections, setSections] = useState<SectionData[]>([]);
+
+  useEffect(() => {
+    dispatch(setCurrentRoute({pageId: PAGE_ID}));
+  }, [])
 
   // Mock fetch
   useEffect(() => {
@@ -89,7 +97,15 @@ const selectScreen = () => {
      <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.headerContainer}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.backButton} onPress={() => {
+            if (router.canGoBack()) 
+              router.back()
+
+            router.push({
+              pathname: '/(tabs)/transaction',
+              params: { tab: 'saved' }
+            } as any);
+          }}>
             <Ionicons name="chevron-back-outline" size={30} color="#FFFFFF"/>
           </TouchableOpacity>
           <Text style={styles.header}>Tạo mới giao dịch</Text>

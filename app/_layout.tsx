@@ -1,4 +1,3 @@
-// app/_layout.tsx
 import React, { useEffect, useRef } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -9,6 +8,9 @@ import * as Sentry from "@sentry/react-native";
 import * as Notifications from 'expo-notifications';
 import { registerForPushNotificationsAsync } from "@/utils/notifications";
 import { Platform } from "react-native";
+import { Provider } from 'react-redux';
+import { PersistGate } from 'redux-persist/integration/react';
+import { persistor, store } from '../store/store';
 
 Sentry.init({
   dsn: "https://817dbd09cef2c274fa62598d5670cb64@o4510502748487680.ingest.de.sentry.io/4510502813368400",
@@ -84,34 +86,36 @@ export default Sentry.wrap(function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    <>
-      <StatusBar style="light" backgroundColor={colors.Neutral200} />
+    <Provider store={store}>
+      <PersistGate loading={null} persistor={persistor}>
+        <StatusBar style="light" backgroundColor={colors.Neutral200} />
 
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: colors.Neutral200 },
-          animation: "slide_from_right",
-        }}
-      >
-        <Stack.Screen
-          name="HomeScreen"
-          options={{ title: "Smart Debt" }}
-        />
-        <Stack.Screen name="OnboardingScreen" options={{ title: "Smart Debt" }} />
-        <Stack.Screen name="auth/AuthScreen" options={{ title: "Auth" }} />
-        <Stack.Screen name="auth/login" options={{ title: "Login" }} />
-        <Stack.Screen name="auth/register" options={{ title: "Register" }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="screen/add-transaction" options={{ title: "Thêm giao dịch" }} />
-        <Stack.Screen name="screen/create-group" options={{ title: "Tạo nhóm" }} />
-        <Stack.Screen name="notifications" options={{ title: "Thông báo" }} />
-        <Stack.Screen name="transaction-detail" options={{ title: "Chi tiết giao dịch" }} />
-        <Stack.Screen name="create-group" options={{ title: "Tạo nhóm" }} />
-        <Stack.Screen name="profile-info" options={{ title: "Thông tin cá nhân" }} />
-        <Stack.Screen name="help-center" options={{ title: "Trung tâm trợ giúp" }} />
-        <Stack.Screen name="app-info" options={{ title: "Thông tin ứng dụng" }} />
-      </Stack>
-    </>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: colors.Neutral200 },
+            animation: "slide_from_right",
+          }}
+        >
+          <Stack.Screen
+            name="index"
+            options={{ title: "Smart Debt" }}
+          />
+          <Stack.Screen name="OnboardingScreen" options={{ title: "Smart Debt" }} />
+          <Stack.Screen name="auth/AuthScreen" options={{ title: "Auth" }} />
+          <Stack.Screen name="auth/login" options={{ title: "Login" }} />
+          <Stack.Screen name="auth/register" options={{ title: "Register" }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="screen/add-transaction" options={{ title: "Thêm giao dịch" }} />
+          <Stack.Screen name="screen/create-group" options={{ title: "Tạo nhóm" }} />
+          <Stack.Screen name="notifications" options={{ title: "Thông báo" }} />
+          <Stack.Screen name="transaction-detail" options={{ title: "Chi tiết giao dịch" }} />
+          <Stack.Screen name="create-group" options={{ title: "Tạo nhóm" }} />
+          <Stack.Screen name="profile-info" options={{ title: "Thông tin cá nhân" }} />
+          <Stack.Screen name="help-center" options={{ title: "Trung tâm trợ giúp" }} />
+          <Stack.Screen name="app-info" options={{ title: "Thông tin ứng dụng" }} />
+        </Stack>
+      </PersistGate>
+    </Provider>
   );
 });

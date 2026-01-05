@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   SafeAreaView,
   View,
@@ -12,6 +12,8 @@ import { BellSimple, QrCode, Plus } from "phosphor-react-native";
 import { useRouter } from "expo-router";
 import { colors, spacingX, spacingY, radius } from "@/constants/theme";
 import { scale } from "@/utils/stylings";
+import { setCurrentRoute } from '@/store/progress';
+import { useDispatch } from 'react-redux';
 
 type Transaction = {
   id: string;
@@ -71,6 +73,8 @@ const formatCurrency = (value: number) =>
   `${value.toLocaleString("vi-VN")}đ`;
 
 const HomeScreen = () => {
+  const PAGE_ID = 'home';
+  const dispatch = useDispatch();
   const router = useRouter();
 
   return (

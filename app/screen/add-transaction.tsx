@@ -2,8 +2,9 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Checkbox from 'expo-checkbox';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  AppState,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -13,24 +14,72 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Dropdown } from 'react-native-element-dropdown';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { shallowEqual, useDispatch, useSelector } from 'react-redux';
+import { clearPageProgress, setCurrentRoute, updatePageProgress } from '../../store/progress';
+
 
 const addTransactionScreen = () => {
+  const PAGE_ID = 'add-transaction'
   const router = useRouter();
   const params = useLocalSearchParams();
+  const dispatch = useDispatch();
   
-  const [userName, setUserName] = useState((params.userName as string) || "");
-  const [userType, setUserType] = useState((params.type as string) || "");
-  const [isSaved, setSaved] = useState(true);
-  const [isRepeat, setRepeat] = useState(false);
-  const [amount, setAmount] = useState("50.000");
-  const [note, setNote] = useState("");
+  const saved = useSelector((s:any) => (s.progress?.pageProgress?.[PAGE_ID]) || {}, shallowEqual);
 
-  const [type, setType] = useState("muon");
-  const [reminder, setReminder] = useState("1_day");
-  const [date, setDate] = useState(new Date());
+  const [userName, setUserName] = useState((params.userName as string) || saved.userName || "");
+  const [userType, setUserType] = useState((params.type as string) || saved.userType || "");
+  const [isSaved, setSaved] = useState(saved.isSaved ?? true);
+  const [isRepeat, setRepeat] = useState(saved.isRepeat ?? false);
+  const [amount, setAmount] = useState(saved.amount ?? "50000");
+  const [note, setNote] = useState(saved.note ?? "");
+
+  const [type, setType] = useState(saved.type ?? "muon");
+  const [reminder, setReminder] = useState(saved.reminder ?? "1_day");
+  const [date, setDate] = useState(saved.date ? new Date(saved.date) : new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // keep latest values in ref for flushing on background
+  const latestRef = useRef<any>({});
+  useEffect(() => {
+    latestRef.current = { userName, userType, isSaved, isRepeat, amount, note, type, reminder, date: date.toISOString() }
+  }, [userName, userType, isSaved, isRepeat, amount, note, type, reminder, date])
+
+  // debounce save
+  const saveTimeout = useRef<any>(null);
+  const scheduleSave = useCallback(() => {
+    if (saveTimeout.current) clearTimeout(saveTimeout.current)
+    saveTimeout.current = setTimeout(() => {
+      dispatch(updatePageProgress({ pageId: PAGE_ID, data: latestRef.current }))
+    }, 400);
+  }, [])
+
+  useEffect(() => {
+    // schedule save whenever any field changes
+    scheduleSave();
+    return () => { if (saveTimeout.current) clearTimeout(saveTimeout.current) };
+  }, [userName, userType, isSaved, isRepeat, amount, note, type, reminder, date, scheduleSave])
+
+  // AppState listener to flush on background
+  useEffect(() => {
+    const onStateChange = (nextState: string) => {
+      if (nextState === 'background' || nextState === 'inactive') {
+        dispatch(updatePageProgress({ pageId: PAGE_ID, data: latestRef.current }))
+        dispatch(setCurrentRoute({pageId: '/screen/add-transaction'}))
+      }
+    };
+    const sub = AppState.addEventListener('change', onStateChange);
+    return () => sub.remove();
+  }, [])
+
+  // mark current route while on this screen
+  useEffect(() => {
+    dispatch(setCurrentRoute({pageId: PAGE_ID}));
+    return () => { 
+      dispatch(clearPageProgress(PAGE_ID))
+    };
+  }, [])
 
   const typeData = [
     { label: 'Mượn nợ', value: 'muon' },
@@ -49,11 +98,34 @@ const addTransactionScreen = () => {
     if (selectedDate) setDate(selectedDate);
   };
 
+  const onSubmit = async () => {
+    try {
+      // Call API
+      dispatch(clearPageProgress(PAGE_ID))
+      dispatch(setCurrentRoute({pageId: null}))
+      router.push('/(tabs)/home')
+    } catch (err) {
+      // handle error
+      console.warn('submit error', err)
+    }
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.headerContainer}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.backButton} onPress={() => {
+            if (router.canGoBack()) {
+              router.back()
+              return;
+            }
+
+            router.push({
+              pathname: '/(tabs)/transaction',
+              params: { tab: 'recent' }
+            } as any);
+            }
+          }>
             <Ionicons name="chevron-back-outline" size={30} color="#FFFFFF"/>
           </TouchableOpacity>
           <Text style={styles.header}>Tạo mới giao dịch</Text>
@@ -74,8 +146,10 @@ const addTransactionScreen = () => {
             )}
             </View>
 
+          {/* TODO */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Loại</Text>
+            {userType == 'user' && (
             <Dropdown
               style={styles.dropdown}
               containerStyle={styles.dropdownContainer}
@@ -88,7 +162,12 @@ const addTransactionScreen = () => {
               value={type}
               onChange={item => setType(item.value)}
               renderRightIcon={() => <Ionicons name="chevron-down" size={20} color="#AAA" />}
-            />
+            />)}
+            {userType != 'user' && (
+              <View style={[styles.input, styles.disabledInput]}>
+                <Text style={styles.selectedText}>Chi tiêu nhóm</Text>
+              </View>
+            )}
           </View>
 
           {/* Ngày trả */}
@@ -143,7 +222,7 @@ const addTransactionScreen = () => {
         </ScrollView>
 
         <View style={styles.footer}>
-          <TouchableOpacity style={styles.submitBtn}>
+          <TouchableOpacity style={styles.submitBtn} onPress={onSubmit}>
             <Text style={styles.submitBtnText}>Tạo mới</Text>
           </TouchableOpacity>
         </View>
@@ -274,5 +353,8 @@ const styles = StyleSheet.create({
     color: '#FFF', 
     fontSize: 18, 
     fontWeight: 'bold' 
+  },
+  disabledInput: {
+    borderColor: '#666',
   },
 })

@@ -8,6 +8,9 @@ import { ActivityIndicator, Dimensions, Image, SectionList, StyleSheet, Text, To
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { SearchContext } from './transaction';
 
+import { useSelector } from 'react-redux';
+import { RootState } from '@/store/store';
+
 interface InfoItem {
   id: string,
   name: string,
@@ -24,7 +27,10 @@ const GroupScreen = () => {
   const [fullData, setFullData] = useState<SectionData[]>([]);
   const [displayData, setDisplayData] = useState<SectionData[]>([]);
 
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(true);
+  const auth = useSelector((state: RootState) => state.auth);
+  const userId = auth.user;
+
   const fetchData = () => {
     const mockData: SectionData[] = [
       {
@@ -117,21 +123,13 @@ const GroupScreen = () => {
               />
             )
           }
-          <TouchableOpacity style={styles.addNew} onPress={async () => {
-            try {
-              // Try to read current user id from AsyncStorage
-              const userId = await AsyncStorage.getItem('currentUserId');
-              // Navigate to create-group screen, passing the user id (if available)
-              router.push({
+          <TouchableOpacity style={styles.addNew} onPress={ () => {
+            router.push({
                 pathname: '/screen/create-group',
                 params: {
                   userId: userId ?? ''
                 }
               });
-            } catch (err) {
-              // If storage read fails, still navigate but without userId
-              router.push({ pathname: '/screen/create-group', params: { userId: '' } });
-            }
           }}>
             <AntDesign name="plus" size={35} color="white" />
           </TouchableOpacity>

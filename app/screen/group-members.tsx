@@ -3,6 +3,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Dimensions, Image, SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useDispatch } from 'react-redux';
+import { setCurrentRoute } from '@/store/progress';
 
 interface Member {
   id: string;
@@ -18,6 +20,8 @@ interface SectionData {
 const screen_width  = Dimensions.get('window').width
 
 const GroupMembersScreen = () => {
+  const PAGE_ID = 'group-members';
+  const dispatch = useDispatch();
   const router = useRouter();
   const params = useLocalSearchParams<{ groupId?: string; groupName?: string }>();
   const groupId = (params.groupId as string) || '';
@@ -28,45 +32,49 @@ const GroupMembersScreen = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    dispatch(setCurrentRoute({pageId: PAGE_ID}));
+  }, [])
+
+  useEffect(() => {
     const fetchMembers = async () => {
-      setIsLoading(true);
-      setError(null);
+    setIsLoading(true);
+    setError(null);
 
-      if (!groupId) {
-        setError('Không tìm thấy id nhóm');
-        setSections([]);
-        setIsLoading(false);
-        return;
-      }
+    if (!groupId) {
+      setError('Không tìm thấy id nhóm');
+      setSections([]);
+      setIsLoading(false);
+      return;
+    }
 
-      try {
-        // Replace URL with your backend endpoint
-        const res = await fetch(`https://your-backend.example.com/api/groups/${groupId}/members`);
-        if (!res.ok) throw new Error('Fetch failed');
-        const data = await res.json();
-        // expected data shape: [{ id, name, lastTransaction? }, ...]
-        setSections([{ title: 'Thành viên', data }]);
-      } catch (err) {
-        // Fallback to mock data if backend not available
-        const mock: SectionData[] = [
-          {
-            title: 'Thành viên',
-            data: [
-              { id: '1', name: 'Antony', lastTransaction: 'Giao dịch gần đây' },
-              { id: '2', name: 'Benjamin', lastTransaction: 'Giao dịch gần đây' },
-              { id: '3', name: 'Nguyễn Văn A', lastTransaction: 'Giao dịch gần đây' },
-            ],
-          },
-        ];
-        setSections(mock);
-        // optional: setError('Không thể tải dữ liệu. Hiển thị dữ liệu mẫu.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    try {
+      // Replace URL with your backend endpoint
+      const res = await fetch(`https://your-backend.example.com/api/groups/${groupId}/members`);
+      if (!res.ok) throw new Error('Fetch failed');
+      const data = await res.json();
+      // expected data shape: [{ id, name, lastTransaction? }, ...]
+      setSections([{ title: 'Thành viên', data }]);
+    } catch (err) {
+      // Fallback to mock data if backend not available
+      const mock: SectionData[] = [
+        {
+          title: 'Thành viên',
+          data: [
+            { id: '1', name: 'Antony', lastTransaction: 'Giao dịch gần đây' },
+            { id: '2', name: 'Benjamin', lastTransaction: 'Giao dịch gần đây' },
+            { id: '3', name: 'Nguyễn Văn A', lastTransaction: 'Giao dịch gần đây' },
+          ],
+        },
+      ];
+      setSections(mock);
+      // optional: setError('Không thể tải dữ liệu. Hiển thị dữ liệu mẫu.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    fetchMembers();
-  }, [groupId]);
+  fetchMembers();
+}, [groupId]);
 
   const openMember = (m: Member) => {
     router.push({

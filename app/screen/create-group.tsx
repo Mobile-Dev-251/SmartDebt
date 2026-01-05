@@ -3,6 +3,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, SectionList, StyleSheet, Text, TextInput, TouchableOpacity, View, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { setCurrentRoute } from '@/store/progress';
+import { useDispatch } from 'react-redux';
 
 interface SavedUser {
   id: string;
@@ -17,6 +19,8 @@ interface SectionData {
 const screen_width = Dimensions.get('window').width
 
 const CreateGroupScreen = () => {
+  const PAGE_ID = 'create-group';
+  const dispatch = useDispatch();
   const router = useRouter();
   const params = useLocalSearchParams<{ userId?: string }>();
   const userId = (params.userId as string) || '';
@@ -28,30 +32,36 @@ const CreateGroupScreen = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]); // Selected list
 
   useEffect(() => {
+    dispatch(setCurrentRoute({ pageId: PAGE_ID }));
+
     // Fetch saved users for the current user (mocked here)
     const fetchSavedUsers = async () => {
-      setIsLoading(true);
-    //   if (!userId) {
-    //     // No user id: show empty and a message
-    //     setSections([]);
-    //     setIsLoading(false);
-    //     return;
-    //   }
+      if (!userId) {
+        setIsLoading(false);
+        return;
+      }
 
-      // TODO: Replace mock data with query later
-      const mock: SectionData[] = [
-        {
-          title: 'Đã lưu',
-          data: [
-            { id: '1', name: 'Antony' },
-            { id: '2', name: 'Hoàng Phương Bình' },
-            { id: '3', name: 'Nguyễn Văn A' },
-          ],
-        },
-      ];
+      try {
+        setIsLoading(true);
+      
+        // Call API
+        const mock: SectionData[] = [
+          {
+            title: 'Đã lưu',
+            data: [
+              { id: '1', name: 'Antony' },
+              { id: '2', name: 'Hoàng Phương Bình' },
+              { id: '3', name: 'Nguyễn Văn A' },
+            ],
+          },
+        ];
 
-      setSections(mock);
-      setIsLoading(false);
+        setSections(mock);
+      } catch (error) {
+        console.error("Lỗi khi lấy danh sách bạn bè:", error);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     fetchSavedUsers();

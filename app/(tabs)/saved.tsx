@@ -13,7 +13,6 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { Int32 } from 'react-native/Libraries/Types/CodegenTypes';
 import { SearchContext } from './transaction';
 
 interface InfoItem {
@@ -31,11 +30,7 @@ const SavedScreen = () => {
   const [fullData, setFullData] = useState<SectionData[]>([]);
   const [displayData, setDisplayData] = useState<SectionData[]>([]);
 
-  const [isLoading, setIsLoading] = useState(true)
-  
-  const viewProfile = ({name, id}: {name: string, id: Int32}) => {
-
-  }
+  const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = () => {
     const mockData: SectionData[] = [{

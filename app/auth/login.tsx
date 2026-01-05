@@ -15,8 +15,11 @@ import { scale, verticalScale } from "@/utils/stylings";
 import { colors, spacingX, spacingY, radius } from "@/constants/theme";
 import { login } from "@/service/authService";
 import { storage } from "@/utils/storage";
+import { useDispatch, useSelector } from "react-redux";
+import { logIn } from "@/store/auth";
 
 const LoginScreen = () => {
+  const dispatch = useDispatch();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,6 +37,20 @@ const LoginScreen = () => {
         email: email,
         password: password,
       };
+      /*DEBUG SESSION*/
+      if (true){
+        try {
+          alert("Demo đăng nhập thành công");
+          dispatch(logIn({ user: 'demo_user', token: 'demo@user' }));
+          setLoading(false);
+          router.replace("/(tabs)/home"); 
+        } catch (error) {
+          setLoading(false);
+          alert("Đăng nhập thất bại");
+        }
+      }
+      else {
+      /*DEBUG SESSION*/
       const response = await login(userData);
       
       // Check if response has token
@@ -55,6 +72,7 @@ const LoginScreen = () => {
         alert("Đăng nhập thất bại. Vui lòng thử lại.");
         setLoading(false);
       }
+      } // REMEMBER TO REMOVE THIS BRACKET
     } catch (error: any) {
       setLoading(false);
       const errorMessage = error?.message || error?.error || "Đăng nhập thất bại";

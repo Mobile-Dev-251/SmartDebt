@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useDebugValue, useEffect, useState } from 'react';
 import {
   Dimensions,
   Image,
@@ -15,6 +15,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import Entypo from '@expo/vector-icons/Entypo';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useDispatch, useSelector } from 'react-redux';
+import { Transaction } from 'firebase/firestore';
+import { UserProfile, setCurrentRoute } from '@/store/progress';
+import { RootState } from '@/store/store';
 
 const { width } = Dimensions.get('window');
 
@@ -53,17 +57,32 @@ const transaction_list = [
 ];
 
 const TransUserScreen = () => {
+  const PAGE_ID = '[id]';
+  const dispatch = useDispatch();
   const item = useLocalSearchParams();
   const [userType, setUserType] = useState((item.type as string) || "");
   const [type, setType] = useState("unsaved");
   const [showMenu, setShowMenu] = useState(false);
   const [showGroupOption, setShowGroupOption] = useState(false);
   const router = useRouter();
+  const { prevRoute } = useSelector((state: RootState) => state.progress)
 
   const details_choices = [
     { label: 'Hủy lưu', value: 'unsaved' }
   ];
 
+  useEffect(() => {
+    const id = Array.isArray(item.id) ? item.id[0] : (item.id || null);
+    const userName = Array.isArray(item.name) ? item.name[0] : (item.name || "Không tên");
+    const userType = Array.isArray(item.type) ? item.type[0] : (item.type || "");
+
+    const userData: UserProfile = {
+      id: id,
+      userName: userName,
+      type: userType
+    }
+    dispatch(setCurrentRoute({pageId: PAGE_ID, user: userData }));
+  }, [item.name, dispatch]);
   const renderItem = ({ item: transaction }: any) => (
     <View style={styles.transactionCard}>
       <Image 
@@ -71,7 +90,7 @@ const TransUserScreen = () => {
         style={styles.cardAvatar} 
       />
       <View style={styles.cardInfo}>
-        <Text style={styles.cardName}>{item.name || "Không thể tìm thấy tên"}</Text>
+        <Text style={styles.cardName}>{item.name || "Không tên"}</Text>
         <Text style={styles.cardSubTitle}>{transaction.title}</Text>
       </View>
       <View style={styles.cardAmountContainer}>
@@ -85,9 +104,24 @@ const TransUserScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.headerContainer}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backButton} onPress={() => {
+          if (router.canGoBack()) {
+            router.back();
+            return;
+          }
+
+          // Nếu khôi phục tiến trình, xác định Tab dựa trên prevRoute hoặc item.type
+          let targetTab = 'recent'; 
+          if (prevRoute === 'saved' || item.type === 'user') targetTab = 'saved';
+          if (prevRoute === 'group' || item.type === 'group') targetTab = 'group';
+
+          // Điều hướng về trang transaction kèm tham số 'tab'
+          router.push({
+            pathname: '/(tabs)/transaction',
+            params: { tab: targetTab }
+          } as any);
+        }}>
           <Ionicons name="chevron-back-outline" size={30} color="#FFFFFF"/>
         </TouchableOpacity>
         <Text style={styles.header} pointerEvents="none">{item.type == 'user' ? 'Thông tin' : 'Nhóm'}</Text>
@@ -191,6 +225,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 10,
     paddingHorizontal: 5,
+    zIndex: 1,
   },
   header: {
     position: 'absolute',
@@ -200,6 +235,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: width * 0.0681,
     textAlign: 'center',
+    zIndex: -1,
   },
   backButton: {
     width: Dimensions.get('window').width * 0.1,
