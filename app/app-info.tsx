@@ -11,11 +11,13 @@ import { useRouter } from "expo-router";
 import { ArrowLeft, ShieldCheck, Star, HardDrive, EnvelopeSimple } from "phosphor-react-native";
 import { colors, spacingX, spacingY, radius } from "@/constants/theme";
 import { scale } from "@/utils/stylings";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 const AppInfoScreen = () => {
   const router = useRouter();
 
   return (
+    <SafeAreaProvider>
     <SafeAreaView style={styles.container}>
       {/* Header Bar */}
       <View style={styles.headerBar}>
@@ -94,6 +96,7 @@ const AppInfoScreen = () => {
         <Text style={styles.footerText}>Made with ❤️ for Friendship</Text>
       </ScrollView>
     </SafeAreaView>
+    </SafeAreaProvider>
   );
 };
 
@@ -130,7 +133,7 @@ const styles = StyleSheet.create({
   },
   logoText: {
     fontSize: scale(36),
-    fontFamily: 'RowdiesBold', // Giống font trang Auth của bạn
+    fontFamily: 'RowdiesBold', 
     fontWeight: '900',
     color: colors.primary300,
     letterSpacing: 2,
@@ -148,7 +151,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.Neutral300,
-    borderRadius: radius._16,
+    borderRadius: radius._17,
     padding: spacingX._20,
     marginBottom: spacingY._20,
   },

@@ -7,6 +7,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { useDispatch } from 'react-redux';
 import { setCurrentRoute } from '@/store/progress';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 const TabsLayout = () => {
   const dispatch = useDispatch();
@@ -15,6 +16,7 @@ const TabsLayout = () => {
   //                   "Gần đây";
 
   return (
+    <SafeAreaProvider>
     <Tabs
     screenListeners={{
       state: (e) => {
@@ -83,6 +85,7 @@ const TabsLayout = () => {
       <Tabs.Screen name="recent" options={{ href: null }} />
       <Tabs.Screen name="saved" options={{ href: null }} />
     </Tabs>
+    </SafeAreaProvider>
   );
 };
 

@@ -17,6 +17,8 @@ import {
   HeartStraight,
   SignOut,
 } from "phosphor-react-native";
+import { useDispatch } from "react-redux";
+import { logOut } from "@/store/auth";
 
 type MenuItem = {
   id: string;
@@ -28,6 +30,7 @@ type MenuItem = {
 
 const ProfileScreen = () => {
   const router = useRouter();
+  const dispatch = useDispatch();
 
   const menu: MenuItem[] = [
     {
@@ -62,7 +65,12 @@ const ProfileScreen = () => {
     {
       id: "logout",
       label: "Đăng xuất",
-      onPress: () => alert("Đăng xuất (chưa triển khai)"),
+      onPress: () => 
+      {
+        dispatch(logOut());
+        // alert("Đăng xuất (chưa triển khai)")
+        router.push('/auth/AuthScreen');
+      },
       icon: (
         <SignOut size={scale(18)} color={colors.primary300} weight="bold" />
       ),
