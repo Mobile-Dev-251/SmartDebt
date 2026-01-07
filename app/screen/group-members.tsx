@@ -314,4 +314,11 @@ const styles = StyleSheet.create({
     color: '#fff', 
     fontSize: 12 
   },
+  addBtn: {
+    backgroundColor: '#3875F6',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    margin: 16
+  },
 });
