@@ -84,9 +84,12 @@ const LoginScreen = () => {
         try {
           console.log('Fetching notifications...');
           const notificationsResponse = await getMyNotifications();
-          if (notificationsResponse.data) {
-            dispatch(setNotifications(notificationsResponse.data));
-            console.log('Notifications updated:', notificationsResponse.data.length);
+          const notificationsData = Array.isArray(notificationsResponse) 
+            ? notificationsResponse 
+            : (notificationsResponse.data || []);
+          if (notificationsData.length > 0) {
+            dispatch(setNotifications(notificationsData));
+            console.log('Notifications updated:', notificationsData.length);
           }
         } catch (error) {
           console.error('Failed to fetch notifications:', error);
