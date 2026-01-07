@@ -33,6 +33,7 @@ type NotificationItem = {
   content: string;
   avatar_url?: string;
   isRead: boolean; // <--- THÊM TRƯỜNG NÀY ĐỂ TRACK TRẠNG THÁI
+  createdAt: Date;
   payload: {
     id?: string;
     type?: string;
@@ -61,6 +62,7 @@ const NotificationsScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [notificationReceived, setNotificationReceived] = useState<any>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [hideRead, setHideRead] = useState(false);
 
   useEffect(() => {
     fetchNotifications();
@@ -119,11 +121,19 @@ const NotificationsScreen = () => {
                   avatar_url: item.avatar_url,
                   // Map is_read từ DB
                   isRead: item.is_read || false,
+                  createdAt: new Date(item.created_at),
                   payload: {
                       id: item.debt_id?.toString(),
                   }
               }));
-              setNotifications(mapped.reverse());
+              // Sắp xếp: chưa đọc trước, đã đọc sau; trong mỗi nhóm sắp xếp theo thời gian mới nhất
+              mapped.sort((a, b) => {
+                  if (a.isRead !== b.isRead) {
+                      return a.isRead ? 1 : -1; // chưa đọc (false) trước
+                  }
+                  return b.createdAt.getTime() - a.createdAt.getTime(); // mới nhất trước
+              });
+              setNotifications(mapped);
           }
       } catch (error) {
           console.error("Failed to fetch notifications", error);
@@ -199,15 +209,20 @@ const NotificationsScreen = () => {
         {/* ... (Giữ nguyên phần Test Section nếu cần) ... */}
 
         <Text style={styles.sectionTitle}>Thông báo của bạn</Text>
+        <TouchableOpacity style={styles.toggleButton} onPress={() => setHideRead(!hideRead)}>
+          <Text style={styles.toggleText}>{hideRead ? 'Hiện thông báo đã đọc' : 'Ẩn thông báo đã đọc'}</Text>
+        </TouchableOpacity>
         {notifications.some(n => !n.isRead) && (
           <TouchableOpacity style={styles.markAllButton} onPress={handleMarkAllAsRead}>
             <Text style={styles.markAllText}>Đánh dấu tất cả đã đọc</Text>
           </TouchableOpacity>
         )}
-        {notifications.length === 0 ? (
-             <Text style={{color: '#888', textAlign: 'center', marginTop: 20}}>Chưa có thông báo nào</Text>
+        {(hideRead ? notifications.filter(n => !n.isRead) : notifications).length === 0 ? (
+             <Text style={{color: '#888', textAlign: 'center', marginTop: 20}}>
+               {hideRead ? 'Không có thông báo chưa đọc' : 'Chưa có thông báo nào'}
+             </Text>
         ) : (
-            notifications.map((item) => (
+            (hideRead ? notifications.filter(n => !n.isRead) : notifications).map((item) => (
             <TouchableOpacity
                 key={item.id}
                 // Thêm style mờ đi nếu đã đọc
@@ -257,6 +272,8 @@ const styles = StyleSheet.create({
   sectionTitle: { color: "#FFFFFF", fontFamily: "RobotoBold", fontSize: scale(16), marginBottom: spacingY._12, marginTop: spacingY._7 },
   markAllButton: { alignSelf: 'flex-end', marginBottom: spacingY._12 },
   markAllText: { color: colors.primary300, fontFamily: "RobotoBold", fontSize: scale(14) },
+  toggleButton: { alignSelf: 'flex-end', marginBottom: spacingY._12 },
+  toggleText: { color: colors.primary300, fontFamily: "RobotoRegular", fontSize: scale(14) },
   
   // Style mới cho chấm chưa đọc
   unreadDot: {

@@ -48,7 +48,7 @@ export const markAllNotificationsAsRead = async () => {
  * @returns {Promise}
  */
 export const updatePushToken = async (pushToken) => {
-  return axios.post("/users/update-push-token", { push_token: pushToken });
+  return axios.post("/users/update-push-token", { token: pushToken });
 };
 
 

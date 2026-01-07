@@ -15,13 +15,12 @@ import { useRouter } from "expo-router";
 import { useFocusEffect } from "expo-router";
 import { colors, spacingX, spacingY, radius } from "@/constants/theme";
 import { scale } from "@/utils/stylings";
-import { formatDateVN } from "@/utils/dateUtils";
 import { useDispatch, useSelector } from "react-redux";
 import { storage } from "../../utils/storage";
 import { getMyProfile } from "@/service/userService";
 import { getMyNotifications } from "@/service/userService";
 import { getAllDebts } from "@/service/debtsService";
-import { setNotifications } from "@/store/notifications";
+import { setUnreadCount } from "@/store/notifications";
 import { RootState } from "@/store/store";
 type Transaction = {
   id: string;
@@ -68,7 +67,8 @@ const HomeScreen = () => {
             getMyProfile().catch(err => console.warn("Profile error", err))
           ]);
           if (Array.isArray(notiRes)) {
-              dispatch(setNotifications(notiRes));
+              const unread = notiRes.filter((n: any) => !readNotificationIds.includes(n.id.toString()));
+              dispatch(setUnreadCount(unread.length));
           }
       } catch (error) {
           console.warn("Failed to fetch notifications", error);
@@ -118,12 +118,7 @@ const HomeScreen = () => {
         const debtsRes: any = await getAllDebts();
         const debts = Array.isArray(debtsRes) ? debtsRes : (debtsRes?.data || []);
 
-        // Sắp xếp debts theo thời gian mới nhất trước
-        debts.sort((a: any, b: any) => {
-          const dateA = new Date(a.created_at || a.due_date).getTime();
-          const dateB = new Date(b.created_at || b.due_date).getTime();
-          return dateB - dateA;
-        });
+        const currentMonth = new Date().getMonth();
         const currentYear = new Date().getFullYear();
         let monthTotal = 0;
         let lendTotal = 0;
@@ -135,15 +130,13 @@ const HomeScreen = () => {
           const isBorrower = currentUserId === debt.borrower_id;
 
           let transactionType: "lend" | "borrow" = "lend";
-          if (debt.type === 'NỢ NHÓM') {
-            transactionType = "group";
-          } else if (debt.type === 'muon') {
+          if (debt.type === 'muon') {
             transactionType = isBorrower ? "borrow" : "lend";
           } else if (debt.type === 'cho_muon') {
             transactionType = isLender ? "lend" : "borrow";
           }
 
-          const amount = Number(debt.debt_amount || debt.amount) || 0;
+          const amount = Number(debt.amount) || 0;
 
           if (debt.status !== 'PAID') {
             if (transactionType === 'lend') lendTotal += amount;
@@ -175,16 +168,14 @@ const HomeScreen = () => {
           }
 
           let transactionType = "lend";
-          if (debt.type === 'NỢ NHÓM') {
-            transactionType = "group";
-          } else if (debt.type === 'muon') {
+          if (debt.type === 'muon') {
             transactionType = isBorrower ? "borrow" : "lend";
           } else if (debt.type === 'cho_muon') {
             transactionType = isLender ? "lend" : "borrow";
           }
 
           const dateObj = new Date(debt.created_at || debt.due_date);
-          const dayKey = formatDateVN(dateObj);
+          const dayKey = dateObj.toLocaleDateString('vi-VN');
 
           if (!grouped[dayKey]) {
             grouped[dayKey] = [];
@@ -223,7 +214,7 @@ const HomeScreen = () => {
 
   const renderTransactionItem = ({ item }: { item: Transaction }) => {
     const moneyColor = item.type === 'borrow' ? '#FF424F' : '#4285F4'; 
-    const typeText = item.type === 'borrow' ? 'Mượn nợ' : item.type === 'group' ? 'Chi tiêu nhóm' : 'Cho mượn';
+    const typeText = item.type === 'borrow' ? 'Mượn nợ' : item.type === 'group' ? 'Chi tiêu nhóm' : item.type === 'lend' ? 'Cho mượn' : '';
 
     return (
       <TouchableOpacity 

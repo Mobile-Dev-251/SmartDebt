@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1015222107120",
+    "project_id": "test-5754e",
+    "storage_bucket": "test-5754e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1015222107120:android:34e54956fb7ec67f787b35",
+        "android_client_info": {
+          "package_name": "com.binh2308.SmartDebt"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAIMdoSqMaEZP4kK05eJx07LsuuZsslw68"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

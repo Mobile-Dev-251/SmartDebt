@@ -7,9 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "smartdebt",
     "userInterfaceStyle": "automatic",
-    "notification": {
-      "iosDisplayInForeground": true
-    },
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
@@ -27,6 +24,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.binh2308.SmartDebt",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
