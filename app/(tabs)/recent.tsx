@@ -7,6 +7,7 @@ import { getAllContacts } from '@/service/contactsService';
 import { useDispatch } from 'react-redux';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { storage } from "../../utils/storage";
+import { formatDateVN } from "@/utils/dateUtils";
 
 interface TransactionItem {
   id: string;
@@ -68,7 +69,7 @@ const RecentScreen = () => {
         }
 
         const dateObj = new Date(debt.created_at || debt.due_date);
-        const dayKey = dateObj.toLocaleDateString('vi-VN'); // dd/mm/yyyy
+        const dayKey = formatDateVN(dateObj); // dd/mm/yyyy
 
         if (!grouped[dayKey]) {
           grouped[dayKey] = [];

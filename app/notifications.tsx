@@ -25,6 +25,7 @@ import { useDispatch, useSelector } from "react-redux";
 // Giả sử markAsRead trong store của bạn đã có logic: state.unreadCount -= 1
 import { markAsRead, markAllAsReadForUser } from "@/store/notifications"; 
 import { RootState } from "@/store/store";
+import { formatDateTimeVN } from "@/utils/dateUtils";
 
 type NotificationItem = {
   id: string;
@@ -113,7 +114,7 @@ const NotificationsScreen = () => {
           if (Array.isArray(res)) {
               const mapped = res.map((item: any) => ({
                   id: item.id.toString(),
-                  dateLabel: new Date(item.created_at).toLocaleDateString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+                  dateLabel: formatDateTimeVN(item.created_at),
                   content: item.body || item.title,
                   avatar_url: item.avatar_url,
                   // Map is_read từ DB

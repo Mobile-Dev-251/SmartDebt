@@ -11,6 +11,7 @@ import { SearchContext } from './transaction';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/store/store';
 import { getMyGroups } from '@/service/groupsService';
+import { formatDateVN } from '@/utils/dateUtils';
 
 interface InfoItem {
   id: string,
@@ -42,7 +43,7 @@ const GroupScreen = () => {
        const formattedGroups: InfoItem[] = groupsList.map((g: any) => ({
          id: g.id.toString(),
          name: g.name,
-         note: g.created_at ? `Tạo ngày ${new Date(g.created_at).toLocaleDateString('vi-VN')}` : 'Không có ngày tạo'
+         note: g.created_at ? `Tạo ngày ${formatDateVN(g.created_at)}` : 'Không có ngày tạo'
        }));
 
        const section: SectionData = {

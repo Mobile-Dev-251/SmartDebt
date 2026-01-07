@@ -15,6 +15,7 @@ import { useRouter } from "expo-router";
 import { useFocusEffect } from "expo-router";
 import { colors, spacingX, spacingY, radius } from "@/constants/theme";
 import { scale } from "@/utils/stylings";
+import { formatDateVN } from "@/utils/dateUtils";
 import { useDispatch, useSelector } from "react-redux";
 import { storage } from "../../utils/storage";
 import { getMyProfile } from "@/service/userService";
@@ -117,7 +118,12 @@ const HomeScreen = () => {
         const debtsRes: any = await getAllDebts();
         const debts = Array.isArray(debtsRes) ? debtsRes : (debtsRes?.data || []);
 
-        const currentMonth = new Date().getMonth();
+        // Sắp xếp debts theo thời gian mới nhất trước
+        debts.sort((a: any, b: any) => {
+          const dateA = new Date(a.created_at || a.due_date).getTime();
+          const dateB = new Date(b.created_at || b.due_date).getTime();
+          return dateB - dateA;
+        });
         const currentYear = new Date().getFullYear();
         let monthTotal = 0;
         let lendTotal = 0;
@@ -178,7 +184,7 @@ const HomeScreen = () => {
           }
 
           const dateObj = new Date(debt.created_at || debt.due_date);
-          const dayKey = dateObj.toLocaleDateString('vi-VN');
+          const dayKey = formatDateVN(dateObj);
 
           if (!grouped[dayKey]) {
             grouped[dayKey] = [];
