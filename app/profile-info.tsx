@@ -35,8 +35,14 @@ const ProfileInfoScreen = () => {
   const [birth, setBirth] = useState("01/01/2004");
   const [showBirth, setShowBirth] = useState(false);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [originalAvatarUrl, setOriginalAvatarUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
+
+  // Helper function to capitalize after spaces (for Vietnamese names)
+  const capitalizeAfterSpaces = (text: string) => {
+    return text.replace(/(\s|^)\w/g, (match) => match.toUpperCase());
+  };
 
   const formatDate = (d: Date) => {
     const dd = String(d.getDate()).padStart(2, "0");
@@ -48,6 +54,12 @@ const ProfileInfoScreen = () => {
   const parseDate = (value: string) => {
     const [dd, mm, yyyy] = value.split("/").map((p) => parseInt(p, 10));
     return new Date(yyyy, mm - 1, dd);
+  };
+
+  // Check if URI is a local file URI (not a server URL)
+  const isLocalUri = (uri: string | null): boolean => {
+    if (!uri) return false;
+    return uri.startsWith('file://') || uri.startsWith('content://') || uri.startsWith('ph://');
   };
 
   useEffect(() => {
@@ -63,34 +75,99 @@ const ProfileInfoScreen = () => {
         setFullName(storedUser.full_name || storedUser.name || "");
         setPhone(storedUser.phone || "");
         setEmail(storedUser.email || "");
+        // Load gender and birth from storage (frontend-only fields)
+        if (storedUser.gender) {
+          setGender(storedUser.gender as "Nam" | "Nữ" | "Khác");
+        }
+        if (storedUser.birth || storedUser.date_of_birth) {
+          setBirth(storedUser.birth || storedUser.date_of_birth || "01/01/2004");
+        }
         if (storedUser.avatar_url) {
           setAvatarUri(storedUser.avatar_url);
+          setOriginalAvatarUrl(storedUser.avatar_url);
         }
       }
 
-      // Fetch from API
-      const response = await getMyProfile();
-      if (response && response.profile && response.profile.length > 0) {
-        const profile = response.profile[0];
-        setFullName(profile.name || "");
-        setPhone(profile.phone || "");
-        setEmail(profile.email || "");
-        if (profile.avatar_url) {
-          setAvatarUri(profile.avatar_url);
+      // Try to fetch from API (but don't block UI if it fails)
+      try {
+        const response = await getMyProfile();
+        let profile = null;
+        
+        // Handle different response formats
+        if (response && response.profile && response.profile.length > 0) {
+          profile = response.profile[0];
+        } else if (response && response.user) {
+          profile = response.user;
+        } else if (response && response.name) {
+          profile = response;
         }
-        // Update storage
-        await storage.setUser({
-          ...storedUser,
-          full_name: profile.name,
-          name: profile.name,
-          phone: profile.phone,
-          email: profile.email,
-          avatar_url: profile.avatar_url,
-        });
+        
+        if (profile) {
+          setFullName(profile.name || "");
+          setPhone(profile.phone || "");
+          setEmail(profile.email || "");
+          
+          // Load gender and birth from API if available (though backend may not support)
+          if (profile.gender) {
+            setGender(profile.gender as "Nam" | "Nữ" | "Khác");
+          }
+          if (profile.birth || profile.date_of_birth) {
+            const birthDate = profile.birth || profile.date_of_birth;
+            if (birthDate) {
+              // Handle different date formats
+              if (typeof birthDate === 'string') {
+                if (birthDate.includes('/')) {
+                  setBirth(birthDate);
+                } else {
+                  // Try to parse ISO date or other formats
+                  const date = new Date(birthDate);
+                  if (!isNaN(date.getTime())) {
+                    setBirth(formatDate(date));
+                  }
+                }
+              }
+            }
+          }
+          
+          if (profile.avatar_url) {
+            setAvatarUri(profile.avatar_url);
+            setOriginalAvatarUrl(profile.avatar_url);
+          }
+          
+          // Update storage with all data
+          await storage.setUser({
+            ...storedUser,
+            full_name: profile.name,
+            name: profile.name,
+            phone: profile.phone,
+            email: profile.email,
+            avatar_url: profile.avatar_url,
+            gender: profile.gender || storedUser?.gender || gender,
+            birth: profile.birth || profile.date_of_birth || storedUser?.birth || birth,
+          });
+        }
+      } catch (apiError: any) {
+        // API call failed, but we already have data from storage
+        console.warn("Không thể cập nhật profile từ API:", apiError?.message || apiError);
+        // Only show error if we don't have cached data
+        if (!storedUser) {
+          Alert.alert(
+            "Cảnh báo", 
+            `Không thể kết nối đến server. Đang sử dụng dữ liệu đã lưu.\n\n${apiError?.message || "Vui lòng kiểm tra kết nối mạng và đảm bảo backend đang chạy."}`
+          );
+        }
       }
     } catch (error: any) {
       console.error("Error loading profile:", error);
-      Alert.alert("Lỗi", "Không thể tải thông tin cá nhân");
+      // Fallback to stored user or show error
+      try {
+        const storedUser = await storage.getUser();
+        if (!storedUser) {
+          Alert.alert("Lỗi", "Không thể tải thông tin cá nhân");
+        }
+      } catch (storageError) {
+        Alert.alert("Lỗi", "Không thể truy cập dữ liệu");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -99,6 +176,12 @@ const ProfileInfoScreen = () => {
   const handleUpdate = async () => {
     if (!fullName.trim()) {
       Alert.alert("Lỗi", "Vui lòng nhập họ và tên");
+      return;
+    }
+
+    // Validate phone if entered
+    if (phone.trim() && (phone.length !== 10 || !phone.startsWith('0'))) {
+      Alert.alert("Lỗi", "Số điện thoại phải bắt đầu bằng 0 và có đúng 10 số");
       return;
     }
 
@@ -112,31 +195,62 @@ const ProfileInfoScreen = () => {
         updateData.phone = phone.trim();
       }
 
-      if (avatarUri) {
+      // Only send avatar_url if it's a server URL, not a local URI
+      // If user selected a new image (local URI), we keep the original URL
+      // Backend doesn't support file upload, so we only update if it's already a URL
+      if (avatarUri && !isLocalUri(avatarUri)) {
         updateData.avatar_url = avatarUri;
+      } else if (originalAvatarUrl && !avatarUri) {
+        // If user removed avatar, keep original
+        updateData.avatar_url = originalAvatarUrl;
+      } else if (originalAvatarUrl && isLocalUri(avatarUri)) {
+        // If user selected new local image, keep original URL (backend doesn't support upload)
+        updateData.avatar_url = originalAvatarUrl;
       }
 
       const response = await updateProfile(updateData);
       
-      if (response && response.status === 200) {
-        // Update storage
+      // Handle different response formats
+      const isSuccess = response && (
+        response.status === 200 || 
+        (typeof response === 'string' && response.includes('Successfully')) ||
+        response.message
+      );
+      
+      if (isSuccess) {
+        // Get current stored user
         const storedUser = await storage.getUser();
-        await storage.setUser({
-          ...storedUser,
-          full_name: response.profile.name,
-          name: response.profile.name,
-          phone: response.profile.phone,
-          avatar_url: response.profile.avatar_url,
-        });
         
-        Alert.alert("Thành công", response.message || "Cập nhật thông tin thành công");
+        // Prepare updated user data
+        const updatedUser = {
+          ...storedUser,
+          full_name: fullName.trim(),
+          name: fullName.trim(),
+          phone: phone.trim() || storedUser?.phone || null,
+          email: email || storedUser?.email || null,
+          // Keep avatar_url as original if local URI was selected, otherwise use the one from response or current
+          avatar_url: (avatarUri && !isLocalUri(avatarUri)) 
+            ? avatarUri 
+            : (originalAvatarUrl || storedUser?.avatar_url || null),
+          // Save frontend-only fields (gender, birth) to storage
+          gender: gender,
+          birth: birth,
+        };
+        
+        // Update storage with all data
+        await storage.setUser(updatedUser);
+        
+        // Update Redux store if needed (optional, depends on your setup)
+        
+        Alert.alert("Thành công", typeof response === 'string' ? response : (response.message || "Cập nhật thông tin thành công"));
         router.back();
       } else {
-        Alert.alert("Lỗi", response?.message || "Không thể cập nhật thông tin");
+        Alert.alert("Lỗi", response?.message || response?.error || "Không thể cập nhật thông tin");
       }
     } catch (error: any) {
       console.error("Error updating profile:", error);
-      Alert.alert("Lỗi", error?.message || "Không thể cập nhật thông tin");
+      const errorMessage = error?.message || error?.error || error?.data?.message || "Không thể cập nhật thông tin";
+      Alert.alert("Lỗi", errorMessage);
     } finally {
       setIsUpdating(false);
     }
@@ -180,7 +294,9 @@ const ProfileInfoScreen = () => {
               });
 
               if (!result.canceled && result.assets[0]) {
+                // Store local URI for display, but keep original URL for backend
                 setAvatarUri(result.assets[0].uri);
+                // Note: Backend doesn't support file upload, so we'll keep original URL when updating
               }
             } catch (error) {
               Alert.alert("Lỗi", "Không thể chọn ảnh từ thư viện");
@@ -208,7 +324,9 @@ const ProfileInfoScreen = () => {
               });
 
               if (!result.canceled && result.assets[0]) {
+                // Store local URI for display, but keep original URL for backend
                 setAvatarUri(result.assets[0].uri);
+                // Note: Backend doesn't support file upload, so we'll keep original URL when updating
               }
             } catch (error) {
               Alert.alert("Lỗi", "Không thể chụp ảnh");
@@ -279,7 +397,7 @@ const ProfileInfoScreen = () => {
           <TextInput
             style={styles.input}
             value={fullName}
-            onChangeText={setFullName}
+            onChangeText={(text) => setFullName(capitalizeAfterSpaces(text))}
             placeholder="Nhập họ tên"
             placeholderTextColor={colors.Neutral100}
           />
@@ -301,7 +419,17 @@ const ProfileInfoScreen = () => {
           <TextInput
             style={styles.input}
             value={phone}
-            onChangeText={setPhone}
+            onChangeText={(text) => {
+              // Only allow digits, start with 0, max 10 characters
+              let formatted = text.replace(/\D/g, ''); // Remove non-digits
+              if (formatted.length > 0 && !formatted.startsWith('0')) {
+                formatted = '0' + formatted.replace(/^0+/, ''); // Ensure starts with 0
+              }
+              if (formatted.length > 10) {
+                formatted = formatted.slice(0, 10); // Limit to 10 digits
+              }
+              setPhone(formatted);
+            }}
             placeholder="Nhập số điện thoại"
             placeholderTextColor={colors.Neutral100}
             keyboardType="phone-pad"

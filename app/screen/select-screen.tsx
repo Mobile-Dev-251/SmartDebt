@@ -20,7 +20,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SearchContext } from '../(tabs)/transaction';
 import { useDispatch } from 'react-redux';
-import { setCurrentRoute } from '@/store/progress';
+import { getAllContacts } from '@/service/contactsService';
 
 interface InfoItem {
   id: string,
@@ -35,7 +35,7 @@ interface SectionData {
 
 const avatar_width = Dimensions.get('window').width * 0.1159;
 
-const selectScreen = () => {
+const SelectScreen = () => {
   const PAGE_ID = 'select-screen';
   const dispatch = useDispatch();
   const router = useRouter();
@@ -48,9 +48,36 @@ const selectScreen = () => {
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
-      // TODO: Replace with actual API call
-      setSections([]);
-      setIsLoading(false);
+      try {
+        const response: any = await getAllContacts();
+        const contactsList = Array.isArray(response) ? response : (response.data || response.contacts || []);
+        
+        // Group by first letter of name
+        const grouped: { [key: string]: InfoItem[] } = {};
+        contactsList.forEach((contact: any) => {
+          const firstLetter = contact.name ? contact.name.charAt(0).toUpperCase() : '#';
+          if (!grouped[firstLetter]) {
+            grouped[firstLetter] = [];
+          }
+          grouped[firstLetter].push({
+            id: contact.id.toString(),
+            name: contact.name || 'Không tên',
+            note: contact.phone || ''
+          });
+        });
+
+        const sectionsData: SectionData[] = Object.keys(grouped).sort().map(letter => ({
+          title: letter,
+          data: grouped[letter]
+        }));
+
+        setSections(sectionsData);
+      } catch (error) {
+        console.error('Error fetching contacts:', error);
+        setSections([]);
+      } finally {
+        setIsLoading(false);
+      }
     }
     fetchData();
   }, [addType]);
@@ -71,13 +98,7 @@ const selectScreen = () => {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.headerContainer}>
           <TouchableOpacity style={styles.backButton} onPress={() => {
-            if (router.canGoBack()) 
-              router.back()
-
-            router.push({
-              pathname: '/(tabs)/transaction',
-              params: { tab: 'saved' }
-            } as any);
+            router.push('/(tabs)/transaction?tab=saved');
           }}>
             <Ionicons name="chevron-back-outline" size={30} color="#FFFFFF"/>
           </TouchableOpacity>
@@ -136,7 +157,7 @@ const selectScreen = () => {
   )
 }
 
-export default selectScreen
+export default SelectScreen
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#2F2E2E' },

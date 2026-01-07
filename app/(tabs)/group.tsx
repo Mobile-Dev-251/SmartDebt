@@ -1,8 +1,8 @@
 import { spacingX } from '@/constants/theme';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router } from 'expo-router';
-import React, { useContext, useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import React, { useContext, useEffect, useState, useCallback } from 'react';
 import { ActivityIndicator, Dimensions, Image, SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { SearchContext } from './transaction';
 
 import { useSelector } from 'react-redux';
 import { RootState } from '@/store/store';
+import { getMyGroups } from '@/service/groupsService';
 
 interface InfoItem {
   id: string,
@@ -31,16 +32,46 @@ const GroupScreen = () => {
   const auth = useSelector((state: RootState) => state.auth);
   const userId = auth.user;
 
-  const fetchData = () => {
-    // TODO: Replace with actual API call
-    setFullData([]);   
-    setDisplayData([]); 
-    setIsLoading(false);
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+       const response: any = await getMyGroups();
+       // Assuming response is array, or { data: [] }
+       const groupsList = Array.isArray(response) ? response : (response.data || response.groups || []);
+       
+       const formattedGroups: InfoItem[] = groupsList.map((g: any) => ({
+         id: g.id.toString(),
+         name: g.name,
+         note: g.created_at ? `Tạo ngày ${new Date(g.created_at).toLocaleDateString('vi-VN')}` : 'Không có ngày tạo'
+       }));
+
+       const section: SectionData = {
+         title: 'Nhóm của tôi',
+         data: formattedGroups
+       };
+
+       if (formattedGroups.length > 0) {
+         setFullData([section]);
+         setDisplayData([section]);
+       } else {
+         setFullData([]);
+         setDisplayData([]);
+       }
+
+    } catch (error) {
+      console.error("Error fetching groups:", error);
+      setFullData([]);
+      setDisplayData([]);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [])
+  );
 
   useEffect(() => {
     if (!searchText || searchText.trim() === '') {
@@ -64,7 +95,20 @@ const GroupScreen = () => {
   const renderInfoItem = ({ item }: { item: InfoItem }) => {
 
     return (
-      <View style={styles.itemContainer}>
+      <TouchableOpacity 
+        style={styles.itemContainer}
+        activeOpacity={0.8}
+        onPress={() => {
+          router.push({
+            pathname: '/trans_user_profile/[id]',
+            params: {
+              id: item.id,
+              name: item.name,
+              type: 'group'
+            }
+          });
+        }}
+      >
         <View style={styles.avatarContainer}>
             <Image 
               source={require('../../assets/images/avatar.png')} 
@@ -73,20 +117,11 @@ const GroupScreen = () => {
         </View>
         <View style={styles.infoContainer}>
           <Text style={styles.nameText}> {item.name} </Text>
-          <TouchableOpacity onPress={()=>{router.push({
-            pathname: '/trans_user_profile/[id]',
-            params: {
-              id: item.id,
-              name: item.name,
-              type: 'group'
-            }
-          })}}> 
-            <Text style={styles.noteText}>
-              {item.note}
-            </Text>
-          </TouchableOpacity>
+          <Text style={styles.noteText}>
+            {item.note}
+          </Text>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -96,7 +131,7 @@ const GroupScreen = () => {
         <View style= {{flex: 1, backgroundColor: '#2F2E2E'}}>
           {
             isLoading? (
-              <ActivityIndicator></ActivityIndicator>
+              <ActivityIndicator style={{marginTop: 20}} color="#FFF"></ActivityIndicator>
             ) : (
               <SectionList 
                 stickySectionHeadersEnabled= {false}
@@ -109,7 +144,7 @@ const GroupScreen = () => {
                 )}
                 ListEmptyComponent={() => (
                     <Text style={{color: 'white', textAlign: 'center', marginTop: 20}}>
-                        Không tìm thấy kết quả
+                        {fullData.length === 0 ? "Bạn chưa tham gia nhóm nào." : "Không tìm thấy kết quả"}
                     </Text>
                 )}
               />

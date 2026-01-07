@@ -1,8 +1,8 @@
 import { colors, radius, spacingX, spacingY } from '@/constants/theme';
 import { scale } from '@/utils/stylings';
-import React, {useState, createContext} from 'react';
+import React, {useState, createContext, useEffect} from 'react';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
-import { Dimensions, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Dimensions, StyleSheet, TextInput, TouchableOpacity, View, Text } from 'react-native';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import EvilIcons from '@expo/vector-icons/EvilIcons';
 
@@ -10,20 +10,43 @@ import GroupScreen from './group';
 import RecentScreen from './recent';
 import SavedScreen from './saved';
 
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { setCurrentRoute } from '@/store/progress';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '@/store/store';
+import { getMyNotifications } from '@/service/userService';
+import { setNotifications } from '@/store/notifications';
+import { useCallback } from 'react';
 
 export const SearchContext = createContext('');   
 const navbar = createMaterialTopTabNavigator();
 
 export default function TransactionScreen() {
   const dispatch = useDispatch();
+  const router = useRouter();
   const { tab } = useLocalSearchParams();
   const [searchText, setSearchText] = useState('');
+  const { unreadCount, readNotificationIds } = useSelector((state: RootState) => state.notifications);
   const initialTab = tab === 'saved' ? "Đã lưu" : 
                      tab === 'group' ? "Nhóm" : 
                      "Gần đây";
+
+  const fetchNotificationCount = useCallback(async () => {
+    try {
+      const notiRes: any = await getMyNotifications();
+      if (Array.isArray(notiRes)) {
+        dispatch(setNotifications(notiRes));
+      }
+    } catch (error) {
+      console.warn("Failed to fetch notifications count", error);
+    }
+  }, [dispatch]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchNotificationCount();
+    }, [fetchNotificationCount])
+  );
 
   return (
       <SearchContext.Provider value={searchText}>
@@ -41,8 +64,18 @@ export default function TransactionScreen() {
                     onChangeText={(text) => setSearchText(text)}
                 />
               </View>
-              <TouchableOpacity style = {styles.notifyButton}>
+              <TouchableOpacity 
+                style={styles.notifyButton}
+                onPress={() => router.push('/notifications')}
+              >
                 <FontAwesome5 name="bell" size={24} color="white" />
+                {unreadCount > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
               
@@ -113,8 +146,27 @@ const styles = StyleSheet.create({
       notifyButton: {
         backgroundColor: '#777777',
         flex: 1,
-        borderRadius: '100%',
+        borderRadius: 100,
         alignItems: 'center',
-        justifyContent: 'center'
-      }
+        justifyContent: 'center',
+        position: 'relative'
+      },
+      badge: {
+        position: "absolute",
+        right: -8,
+        top: -8,
+        backgroundColor: "#FF3B30",
+        borderRadius: 10,
+        minWidth: 20,
+        height: 20,
+        justifyContent: "center",
+        alignItems: "center",
+        borderWidth: 2,
+        borderColor: "#2F2E2E",
+      },
+      badgeText: {
+        color: "#FFFFFF",
+        fontFamily: "RobotoBold",
+        fontSize: scale(10),
+      },
 }) 

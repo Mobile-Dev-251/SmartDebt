@@ -2,7 +2,7 @@ import {createSlice, PayloadAction} from '@reduxjs/toolkit'
 import { REHYDRATE } from 'redux-persist';
 
 interface AuthInfo {
-    user: string | null;
+    user: any;
     token: string | null;
     isLoading: boolean;
 }
@@ -29,8 +29,7 @@ const authSlice = createSlice({
         }
     },
     extraReducers: (builder) => {
-        builder.addCase(REHYDRATE, (state, action: any) => {
-        state.isLoading = false;
+        builder.addCase(REHYDRATE, (state, action: any) => {        console.log('REHYDRATE auth:', action.payload);        state.isLoading = false;
     
         // Data recovered succcessfully
         if (action.payload && action.payload.auth) {

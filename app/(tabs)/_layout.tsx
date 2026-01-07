@@ -23,8 +23,11 @@ const TabsLayout = () => {
         const state = e.data.state;
         const currentTabName = state.routes[state.index].name;
         
-        // console.log(currentTabName)
-        dispatch(setCurrentRoute({ pageId: currentTabName }));
+        // Chỉ lưu progress cho các tab chính
+        const mainTabs = ['home', 'recent', 'saved', 'group', 'statistic', 'profile'];
+        if (mainTabs.includes(currentTabName)) {
+          dispatch(setCurrentRoute({ pageId: currentTabName }));
+        }
       },
     }}
       screenOptions={{

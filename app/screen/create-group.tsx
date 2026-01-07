@@ -1,10 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, SectionList, StyleSheet, Text, TextInput, TouchableOpacity, View, Dimensions } from 'react-native';
+import { ActivityIndicator, Image, SectionList, StyleSheet, Text, TextInput, TouchableOpacity, View, Dimensions, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { setCurrentRoute } from '@/store/progress';
 import { useDispatch } from 'react-redux';
+import { getAllContacts } from '@/service/contactsService';
+import { createNewGroup } from '@/service/groupsService';
 
 interface SavedUser {
   id: string;
@@ -30,17 +32,36 @@ const CreateGroupScreen = () => {
   const [sections, setSections] = useState<SectionData[]>([]);
   const [searchText, setSearchText] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]); // Selected list
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     const fetchSavedUsers = async () => {
-      if (!userId) {
-        setIsLoading(false);
-        return;
-      }
+      // if (!userId) {
+      //   setIsLoading(false);
+      //   return;
+      // }
+      try {
+        const response: any = await getAllContacts();
+        const contactsList = Array.isArray(response) ? response : (response.data || response.contacts || []);
+        
+        // Map to SavedUser format
+        const formattedData: SavedUser[] = contactsList.map((c: any) => ({
+          id: c.user_id_contact?.toString() || c.id.toString(),
+          name: c.name || c.phone || 'Unknown',
+        }));
 
-      // TODO: Replace with actual API call
-      setSections([]);
-      setIsLoading(false);
+        if (formattedData.length > 0) {
+           setSections([{ title: 'Danh bạ đã lưu', data: formattedData }]);
+        } else {
+           setSections([]);
+        }
+
+      } catch (error) {
+        console.error("Error fetching contacts:", error);
+        Alert.alert("Lỗi", "Không thể tải danh sách liên hệ.");
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     fetchSavedUsers();
@@ -58,9 +79,33 @@ const CreateGroupScreen = () => {
     .map(s => ({ ...s, data: s.data.filter(d => d.name.toLowerCase().includes(searchText.toLowerCase())) }))
     .filter(s => s.data.length > 0);
 
-  const handleCreate = () => {
-    // Handle group creation: send groupName + selected members + ownerId (userId) to DB
-    router.back();
+  const handleCreate = async () => {
+    if (!groupName.trim()) {
+       Alert.alert("Lỗi", "Vui lòng nhập tên nhóm");
+       return;
+    }
+    if (selectedIds.length === 0) {
+      Alert.alert("Lỗi", "Vui lòng chọn ít nhất 1 thành viên");
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+       // Backend expects members as array of IDs.
+       await createNewGroup({
+         name: groupName,
+         members: selectedIds
+       });
+       
+       Alert.alert("Thành công", "Tạo nhóm thành công!", [
+         { text: "OK", onPress: () => router.back() }
+       ]);
+    } catch (error) {
+      console.error("Error creating group:", error);
+      Alert.alert("Lỗi", "Không thể tạo nhóm. Vui lòng thử lại.");
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   return (
@@ -97,7 +142,7 @@ const CreateGroupScreen = () => {
         </View>
 
         {isLoading ? (
-          <ActivityIndicator style={{ marginTop: 12 }} />
+          <ActivityIndicator style={{ marginTop: 12 }} color="#FFF" />
         ) : (
           <SectionList
             sections={filteredSections}
@@ -121,7 +166,7 @@ const CreateGroupScreen = () => {
             renderSectionHeader={({ section: { title } }) => <Text style={styles.sectionHeader}>{title}</Text>}
             ListEmptyComponent={() => (
               <Text style={{ color: '#fff', marginTop: 8 }}>
-                {userId ? 'Không có thành viên đã lưu.' : 'Bạn cần đăng nhập để xem danh sách thành viên.'}
+                {filteredSections.length === 0 && searchText ? 'Không tìm thấy kết quả.' : 'Chưa có thành viên nào trong danh bạ.'}
               </Text>
             )}
             contentContainerStyle={{ paddingBottom: 20 }}
@@ -130,8 +175,8 @@ const CreateGroupScreen = () => {
       </View>
 
       <View style={styles.footer}> 
-        <TouchableOpacity style={styles.createBtnFixed} onPress={handleCreate}>
-          <Text style={{ color: '#fff', fontWeight: '700' }}>Tạo nhóm</Text>
+        <TouchableOpacity style={[styles.createBtnFixed, isCreating && { opacity: 0.7 }]} onPress={handleCreate} disabled={isCreating}>
+          {isCreating ? <ActivityIndicator color="#FFF" /> : <Text style={{ color: '#fff', fontWeight: '700' }}>Tạo nhóm</Text>}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

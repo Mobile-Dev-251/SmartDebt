@@ -8,6 +8,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -63,5 +65,17 @@ export async function schedulePushNotification(title: string, body: string, data
       sound: 'default',
     },
     trigger: null,
+  });
+}
+
+export async function scheduleLocalNotification(title: string, body: string, trigger: Notifications.NotificationTriggerInput, data = {}) {
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title,
+      body,
+      data,
+      sound: 'default',
+    },
+    trigger,
   });
 }

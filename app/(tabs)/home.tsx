@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import {
   SafeAreaView,
   View,
@@ -7,62 +7,84 @@ import {
   Image,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
+  SectionList,
 } from "react-native";
 import { BellSimple, QrCode, Plus } from "phosphor-react-native";
 import { useRouter } from "expo-router";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect } from "expo-router";
 import { colors, spacingX, spacingY, radius } from "@/constants/theme";
 import { scale } from "@/utils/stylings";
-import { storage } from "@/utils/storage";
+import { useDispatch, useSelector } from "react-redux";
+import { storage } from "../../utils/storage";
 import { getMyProfile } from "@/service/userService";
+import { getMyNotifications } from "@/service/userService";
 import { getAllDebts } from "@/service/debtsService";
-
+import { setNotifications } from "@/store/notifications";
+import { RootState } from "@/store/store";
 type Transaction = {
   id: string;
   name: string;
   note: string;
-  type: "lend" | "borrow" | "group";
   amount: number;
-  borrowDate?: string;
-  dueDate?: string;
-  remind?: string;
-  group?: string;
-  paidStatus?: "unpaid" | "pending" | "paid";
-  paidCount?: number;
-  totalCount?: number;
+  type: string;
+  rawDate: string;
 };
 
-const formatCurrency = (value: number) =>
-  `${value.toLocaleString("vi-VN")}đ`;
+type SectionData = {
+  title: string;
+  data: Transaction[];
+};
+
+const formatCurrency = (value: number) => {
+  const formatted = Math.abs(value).toLocaleString("vi-VN");
+  return value < 0 ? `-${formatted}đ` : `${formatted}đ`;
+};
 
 const HomeScreen = () => {
+  // 2. LẤY DATA TỪ REDUX
   const PAGE_ID = 'home';
   const dispatch = useDispatch();
   const router = useRouter();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<SectionData[]>([]);
   const [userName, setUserName] = useState<string>("");
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [totalMonth, setTotalMonth] = useState<number>(0);
   const [totalLend, setTotalLend] = useState<number>(0);
   const [totalBorrow, setTotalBorrow] = useState<number>(0);
   const [loadingSummary, setLoadingSummary] = useState<boolean>(true);
+  const { unreadCount, readNotificationIds } = useSelector((state: RootState) => state.notifications);
 
   const loadData = useCallback(async () => {
-    setLoadingSummary(true);
+    if (totalMonth === 0 && totalLend === 0 && totalBorrow === 0) {
+      setLoadingSummary(true);
+    }
     try {
-      // 1. Lấy thông tin user để hiển thị tên
-      let currentUserId: number | null = null;
-      let nameFromStorage = "";
-
-      const storedUser = await storage.getUser();
-      if (storedUser) {
-        nameFromStorage =
-          storedUser.full_name || storedUser.name || storedUser.email || "";
-        if (storedUser.id) {
-          currentUserId = storedUser.id;
-        }
+      // Fetch Notifications
+      try {
+          const [notiRes, profileRes] = await Promise.all([
+            getMyNotifications().catch(err => console.warn("Noti error", err)),
+            getMyProfile().catch(err => console.warn("Profile error", err))
+          ]);
+          if (Array.isArray(notiRes)) {
+              dispatch(setNotifications(notiRes));
+          }
+      } catch (error) {
+          console.warn("Failed to fetch notifications", error);
       }
 
-      // Nếu chưa có tên hoặc id, thử gọi API profile
+      // --- PROFILE USER ---
+      let currentUserId: number | null = null;
+      let nameFromStorage = ""; 
+
+      const storedUser = await storage.getUser(); 
+      
+      if (storedUser) {
+        nameFromStorage = storedUser.full_name || storedUser.name || storedUser.email || "";
+        if (storedUser.id) currentUserId = storedUser.id;
+        if (storedUser.avatar_url) setAvatarUri(storedUser.avatar_url);
+      }
+
       if (!nameFromStorage || currentUserId == null) {
         try {
           const profileRes: any = await getMyProfile();
@@ -72,18 +94,17 @@ const HomeScreen = () => {
 
           if (profileData) {
             if (!nameFromStorage) {
-              nameFromStorage =
-                profileData.full_name ||
-                profileData.name ||
-                profileData.email ||
-                "";
+              nameFromStorage = profileData.full_name || profileData.name || profileData.email || "";
             }
             if (currentUserId == null && profileData.id) {
               currentUserId = profileData.id;
             }
+            if (profileData.avatar_url) {
+              setAvatarUri(profileData.avatar_url);
+            }
           }
-        } catch (e) {
-          console.warn("Không thể lấy profile từ backend:", e);
+        } catch (e: any) {
+          console.warn("Lỗi lấy profile:", e?.message);
         }
       }
 
@@ -91,60 +112,151 @@ const HomeScreen = () => {
         setUserName(nameFromStorage);
       }
 
-      // 2. Lấy danh sách debts để tính chi tiêu tháng này
+      // --- LẤY DEBTS ---
       try {
-        const debts: any[] = await getAllDebts();
+        const debtsRes: any = await getAllDebts();
+        const debts = Array.isArray(debtsRes) ? debtsRes : (debtsRes?.data || []);
 
-        const now = new Date();
-        const currentMonth = now.getMonth();
-        const currentYear = now.getFullYear();
+        const currentMonth = new Date().getMonth();
+        const currentYear = new Date().getFullYear();
+        let monthTotal = 0;
+        let lendTotal = 0;
+        let borrowTotal = 0;
 
-        let monthLend = 0;
-        let monthBorrow = 0;
+        // Tính tổng
+        debts.forEach((debt: any) => {
+          const isLender = currentUserId === debt.lender_id;
+          const isBorrower = currentUserId === debt.borrower_id;
 
-        if (Array.isArray(debts)) {
-          debts.forEach((debt: any) => {
-            const amount = Number(debt.amount || 0);
-            const dueDate = debt.due_date ? new Date(debt.due_date) : null;
+          let transactionType: "lend" | "borrow" = "lend";
+          if (debt.type === 'NỢ NHÓM') {
+            transactionType = "group";
+          } else if (debt.type === 'muon') {
+            transactionType = isBorrower ? "borrow" : "lend";
+          } else if (debt.type === 'cho_muon') {
+            transactionType = isLender ? "lend" : "borrow";
+          }
 
-            if (
-              dueDate &&
-              dueDate.getMonth() === currentMonth &&
-              dueDate.getFullYear() === currentYear
-            ) {
-              // Xác định chiều nợ dựa vào lender_id / borrower_id
-              if (currentUserId != null && debt.lender_id === currentUserId) {
-                monthLend += amount;
-              } else if (
-                currentUserId != null &&
-                debt.borrower_id === currentUserId
-              ) {
-                monthBorrow += amount;
-              } else {
-                // Nếu không xác định được, coi như mượn nợ
-                monthBorrow += amount;
-              }
+          const amount = Number(debt.debt_amount || debt.amount) || 0;
+
+          if (debt.status !== 'PAID') {
+            if (transactionType === 'lend') lendTotal += amount;
+            else borrowTotal += amount;
+
+            const debtDate = new Date(debt.created_at || debt.due_date);
+            if (debtDate.getMonth() === currentMonth && debtDate.getFullYear() === currentYear) {
+              // Logic tính tổng chi tiêu tháng:
+              // Nếu mình cho vay (lend) -> tiền đi ra -> tính vào chi tiêu (+)
+              // Nếu mình vay (borrow) -> tiền đi vào -> (tùy logic, ở đây tạm trừ hoặc không tính)
+              if (transactionType === 'lend') monthTotal += amount;
             }
-          });
-        }
+          }
+        });
 
-        setTotalLend(monthLend);
-        setTotalBorrow(monthBorrow);
-        // Chi tiêu tháng này: tạm thời tính là tổng số tiền mà user phải trả (mượn)
-        setTotalMonth(monthBorrow);
+        // Group by day cho 5 giao dịch gần nhất
+        const grouped: {[key: string]: Transaction[]} = {};
+        const dateKeys: string[] = [];
+
+        debts.slice(0, 5).forEach((debt: any) => {
+          const isLender = currentUserId === debt.lender_id;
+          const isBorrower = currentUserId === debt.borrower_id;
+
+          let displayName = "—";
+          if (isLender) {
+            displayName = debt.borrower_name || `User ${debt.borrower_id}`;
+          } else if (isBorrower) {
+            displayName = debt.lender_name || `User ${debt.lender_id}`;
+          }
+
+          let transactionType = "lend";
+          if (debt.type === 'NỢ NHÓM') {
+            transactionType = "group";
+          } else if (debt.type === 'muon') {
+            transactionType = isBorrower ? "borrow" : "lend";
+          } else if (debt.type === 'cho_muon') {
+            transactionType = isLender ? "lend" : "borrow";
+          }
+
+          const dateObj = new Date(debt.created_at || debt.due_date);
+          const dayKey = dateObj.toLocaleDateString('vi-VN');
+
+          if (!grouped[dayKey]) {
+            grouped[dayKey] = [];
+            dateKeys.push(dayKey);
+          }
+
+          grouped[dayKey].push({
+            id: debt.id.toString(),
+            name: displayName,
+            note: debt.note || "",
+            amount: debt.amount,
+            type: transactionType,
+            rawDate: debt.created_at
+          });
+        });
+
+        const sections: SectionData[] = dateKeys.map(day => ({
+          title: day,
+          data: grouped[day],
+        }));
+
+        setTotalMonth(monthTotal);
+        setTotalLend(lendTotal);
+        setTotalBorrow(borrowTotal);
+        setTransactions(sections);
+
       } catch (e) {
-        console.warn("Không thể lấy dữ liệu debts:", e);
-        setTotalLend(0);
-        setTotalBorrow(0);
-        setTotalMonth(0);
+        console.warn("Lỗi debts:", e);
+        setTransactions([]);
       }
 
-      // 3. (Hiện tại) chưa hiển thị danh sách giao dịch từ backend nên để rỗng
-      setTransactions([]);
     } finally {
       setLoadingSummary(false);
     }
-  }, []);
+  }, [readNotificationIds]); 
+
+  const renderTransactionItem = ({ item }: { item: Transaction }) => {
+    const moneyColor = item.type === 'borrow' ? '#FF424F' : '#4285F4'; 
+    const typeText = item.type === 'borrow' ? 'Mượn nợ' : item.type === 'group' ? 'Chi tiêu nhóm' : 'Cho mượn';
+
+    return (
+      <TouchableOpacity 
+        style={styles.itemContainer}
+        activeOpacity={0.8}
+        onPress={() => {
+          router.push({
+            pathname: '/transaction-detail',
+            params: { id: item.id }
+          });
+        }}
+      >
+        <View style={styles.itemRow}>
+          <View style={styles.avatarContainer}>
+             <Image 
+               source={require('../../assets/images/avatar.png')} 
+               style={styles.avatar} 
+             />
+          </View>
+          <View style={styles.infoContainer}>
+            <Text style={styles.nameText}>{item.name}</Text>
+            <Text style={styles.noteText} numberOfLines={1}>{item.note}</Text>
+          </View>
+          <View style={styles.moneyContainer}>
+            <Text style={styles.typeText}>{typeText}</Text>
+            <Text style={[styles.amountText, { color: moneyColor }]}>{`${Number(item.amount).toLocaleString()}đ`}</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderSectionHeader = ({ section }: { section: { title: string } }) => {
+    return (
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionHeaderText}>{section.title}</Text>
+      </View>
+    );
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -154,152 +266,87 @@ const HomeScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.header}>
-          <View style={styles.profileInfo}>
-            <Image
-              source={require("@/assets/images/1.png")}
-              style={styles.avatar}
-              resizeMode="cover"
-            />
-            <View>
-              <Text style={styles.profileName}>
-                {userName || "SmartDebt User"}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.iconButton} activeOpacity={0.8}>
-              <QrCode size={22} color="#fff" weight="bold" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.iconButton}
-              activeOpacity={0.8}
-              onPress={() => router.push("/notifications")}
-            >
-              <BellSimple size={22} color="#fff" weight="bold" />
-            </TouchableOpacity>
+      <View style={styles.header}>
+        <View style={styles.profileInfo}>
+          <Image
+            source={
+              avatarUri
+                ? { uri: avatarUri }
+                : require("@/assets/images/avatar.png")
+            }
+            style={styles.avatar}
+            resizeMode="cover"
+          />
+          <View>
+            <Text style={styles.profileName}>
+              {userName || "SmartDebt User"}
+            </Text>
           </View>
         </View>
 
-        <View style={styles.summaryCard}>
-          <Text style={styles.cardLabel}>Chi tiêu tháng này:</Text>
-          <Text style={styles.cardValue}>
-            {loadingSummary ? "..." : formatCurrency(totalMonth)}
-          </Text>
-
-          <View style={styles.cardRow}>
-            <View style={styles.cardColumn}>
-              <Text style={styles.cardSmallLabel}>Cho mượn:</Text>
-              <Text style={[styles.cardSmallValue, styles.lendColor]}>
-                {loadingSummary ? "..." : formatCurrency(totalLend)}
-              </Text>
-            </View>
-            <View style={styles.cardColumn}>
-              <Text style={styles.cardSmallLabel}>Mượn:</Text>
-              <Text style={[styles.cardSmallValue, styles.borrowColor]}>
-                {loadingSummary ? "..." : formatCurrency(totalBorrow)}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Giao dịch gần đây:</Text>
-        </View>
-
-        <View style={styles.transactionList}>
-          {transactions.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={styles.transactionItem}
-              activeOpacity={0.9}
-              onPress={() =>
-                router.push({
-                  pathname: "/transaction-detail",
-                  params: {
-                    type: item.type === "lend" ? "Cho mượn" : item.type === "borrow" ? "Mượn nợ" : "Chi tiêu nhóm",
-                    typeValue: item.type,
-                    name: item.name,
-                    note: item.note,
-                    amount: formatCurrency(item.amount),
-                    group: item.group ?? "",
-                    borrowDate: item.borrowDate ?? "—",
-                    dueDate: item.dueDate ?? "—",
-                    remind: item.remind ?? "—",
-                    paidStatus: item.paidStatus ?? "unpaid",
-                    paidCount: item.paidCount ?? 0,
-                    totalCount: item.totalCount ?? 0,
-                  },
-                })
-              }
-            >
-              <View style={styles.transactionRow}>
-                <Image
-                  source={require("@/assets/images/1.png")}
-                  style={styles.transactionAvatar}
-                  resizeMode="cover"
-                />
-                <View style={styles.transactionInfo}>
-                  <Text style={styles.transactionName}>
-                    {item.type === "group" && item.group ? item.group : item.name}
-                  </Text>
-                  <Text style={styles.transactionNote} numberOfLines={1}>
-                    {item.note}
-                  </Text>
-                </View>
-                <View style={styles.transactionRight}>
-                  <View
-                    style={[
-                      styles.tag,
-                      item.type === "lend"
-                        ? styles.tagLend
-                        : item.type === "group"
-                        ? styles.tagGroup
-                        : styles.tagBorrow,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.tagText,
-                        item.type === "lend"
-                          ? styles.tagLendText
-                          : item.type === "group"
-                          ? styles.tagGroupText
-                          : styles.tagBorrowText,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {item.type === "lend"
-                        ? "Cho mượn"
-                        : item.type === "group"
-                        ? "Chi tiêu nhóm"
-                        : "Mượn nợ"}
-                    </Text>
-                  </View>
-                  <Text
-                    style={[
-                      styles.transactionAmount,
-                      item.type === "lend"
-                        ? styles.lendColor
-                        : item.type === "group"
-                        ? styles.groupColor
-                        : styles.borrowColor,
-                    ]}
-                  >
-                    {formatCurrency(item.amount)}
-                  </Text>
-                </View>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.iconButton} activeOpacity={0.8}>
+            <QrCode size={22} color="#fff" weight="bold" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.iconButton}
+            activeOpacity={0.8}
+            onPress={() => router.push("/notifications")}
+          >
+            <BellSimple size={22} color="#fff" weight="bold" />
+            {unreadCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </Text>
               </View>
-            </TouchableOpacity>
-          ))}
+            )}
+          </TouchableOpacity>
         </View>
-      </ScrollView>
+      </View>
+
+      <View style={styles.summaryCard}>
+        <Text style={styles.cardLabel}>Chi tiêu tháng này:</Text>
+        <Text style={styles.cardValue}>
+          {loadingSummary ? "..." : formatCurrency(totalMonth)}
+        </Text>
+
+        <View style={styles.cardRow}>
+          <View style={styles.cardColumn}>
+            <Text style={styles.cardSmallLabel}>Cho mượn:</Text>
+            <Text style={[styles.cardSmallValue, styles.lendColor]}>
+              {loadingSummary ? "..." : formatCurrency(totalLend)}
+            </Text>
+          </View>
+          <View style={styles.cardColumn}>
+            <Text style={styles.cardSmallLabel}>Mượn:</Text>
+            <Text style={[styles.cardSmallValue, styles.borrowColor]}>
+              {loadingSummary ? "..." : formatCurrency(totalBorrow)}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Giao dịch gần đây:</Text>
+      </View>
+
+      <View style={styles.transactionContainer}>
+        <SectionList
+          sections={transactions}
+          keyExtractor={(item, index) => item.id + index}
+          renderItem={renderTransactionItem}
+          renderSectionHeader={renderSectionHeader}
+          contentContainerStyle={styles.transactionContent}
+          showsVerticalScrollIndicator={false}
+          stickySectionHeadersEnabled={false}
+          ListEmptyComponent={() => !loadingSummary ? (
+            <Text style={{color: colors.Neutral100, textAlign: 'center', marginTop: 10}}>
+              Chưa có giao dịch nào
+            </Text>
+          ) : null}
+        />
+      </View>
 
       <TouchableOpacity
         style={styles.fab}
@@ -307,7 +354,7 @@ const HomeScreen = () => {
         onPress={() => router.push({
           pathname: "/screen/add-transaction",
           params: {
-            userName: "",
+            userName: userName,
             type: 'custom'
           }
         })}
@@ -322,19 +369,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.Neutral200,
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
     padding: spacingX._20,
     paddingBottom: spacingY._60 + spacingY._20,
-    gap: spacingY._20,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginBottom: spacingY._20,
   },
   profileInfo: {
     flexDirection: "row",
@@ -409,16 +451,10 @@ const styles = StyleSheet.create({
   borrowColor: {
     color: "#FF3B30",
   },
-  sectionHeader: {
-    marginTop: spacingY._5,
-  },
   sectionTitle: {
     color: "#FFFFFF",
     fontFamily: "RobotoBold",
     fontSize: scale(16),
-  },
-  transactionList: {
-    gap: spacingY._12,
   },
   transactionItem: {
     backgroundColor: colors.Neutral300,
@@ -505,6 +541,88 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 12,
     elevation: 10,
+  },
+  badge: {
+    position: "absolute",
+    right: -8,
+    top: -8,
+    backgroundColor: "#FF3B30",
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#2F2E2E",
+  },
+  badgeText: {
+    color: "#FFFFFF",
+    fontFamily: "RobotoBold",
+    fontSize: scale(10),
+  },
+  itemContainer: {
+    backgroundColor: colors.Neutral300,
+    borderRadius: radius._12,
+    padding: spacingX._15,
+    marginBottom: spacingY._10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  itemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  avatarContainer: {
+    marginRight: spacingX._12,
+  },
+  infoContainer: {
+    flex: 1,
+  },
+  moneyContainer: {
+    alignItems: "flex-end",
+  },
+  nameText: {
+    color: "#FFFFFF",
+    fontFamily: "RobotoBold",
+    fontSize: scale(16),
+    marginBottom: spacingY._3,
+  },
+  noteText: {
+    color: colors.Neutral100,
+    fontFamily: "RobotoRegular",
+    fontSize: scale(14),
+  },
+  typeText: {
+    color: colors.Neutral100,
+    fontFamily: "RobotoRegular",
+    fontSize: scale(12),
+    marginBottom: spacingY._3,
+  },
+  amountText: {
+    color: "#FFFFFF",
+    fontFamily: "RobotoBold",
+    fontSize: scale(16),
+  },
+  sectionHeader: {
+    backgroundColor: colors.Neutral200,
+    paddingVertical: spacingY._5,
+    paddingHorizontal: spacingX._15,
+    borderRadius: radius._6,
+    marginBottom: spacingY._10,
+  },
+  sectionHeaderText: {
+    color: colors.Neutral100,
+    fontFamily: "RobotoBold",
+    fontSize: scale(14),
+  },
+  transactionContainer: {
+    flex: 1,
+  },
+  transactionContent: {
+    paddingBottom: spacingY._20,
   },
 });
 

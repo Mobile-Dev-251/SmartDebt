@@ -7,16 +7,21 @@ import {
   TouchableOpacity,
   StyleSheet,
   StatusBar,
-  ActivityIndicator,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Keyboard
+  Keyboard,
+  ActivityIndicator
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { scale } from '@/utils/stylings';
 import { colors, spacingX, spacingY, radius } from '@/constants/theme';
 import { register } from '@/service/authService';
+import { storage } from '@/utils/storage';
+import { useDispatch } from 'react-redux';
+import { logIn } from '@/store/auth';
+import { registerForPushNotificationsAsync } from '@/utils/notifications';
+import { updatePushToken } from '@/service/userService';
 
 const RegisterScreen = () => {
   const router = useRouter();
@@ -27,6 +32,11 @@ const RegisterScreen = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Helper function to capitalize after spaces (for Vietnamese names)
+  const capitalizeAfterSpaces = (text: string) => {
+    return text.replace(/(\s|^)\w/g, (match) => match.toUpperCase());
+  };
 
   // Refs điều khiển focus
   const emailRef = useRef<TextInput>(null);
@@ -40,6 +50,12 @@ const RegisterScreen = () => {
     // [MỚI]: Thêm check phone
     if (!name || !email || !phone || !password || !confirmPassword) {
       alert('Vui lòng nhập đầy đủ thông tin.');
+      return;
+    }
+
+    // Validate phone format
+    if (phone.length !== 10 || !phone.startsWith('0')) {
+      alert('Số điện thoại phải bắt đầu bằng 0 và có đúng 10 số.');
       return;
     }
 
@@ -66,7 +82,16 @@ const RegisterScreen = () => {
         router.replace('/auth/login' as any);
       } else {
         setLoading(false);
-        alert(response?.message || 'Đăng ký thất bại');
+        // Check if it's a duplicate phone error
+        const errorMessage = response?.message || response?.error || 'Đăng ký thất bại';
+        if (errorMessage.toLowerCase().includes('phone') && 
+            (errorMessage.toLowerCase().includes('exist') || 
+             errorMessage.toLowerCase().includes('duplicate') ||
+             errorMessage.toLowerCase().includes('đã'))) {
+          alert('Số điện thoại này đã được đăng ký. Vui lòng sử dụng số điện thoại khác.');
+        } else {
+          alert(errorMessage);
+        }
       }
     } catch (error: any) {
       setLoading(false);
@@ -110,7 +135,7 @@ const RegisterScreen = () => {
                   placeholder="Nhập tên"
                   placeholderTextColor={colors.Neutral100}
                   value={name}
-                  onChangeText={setName}
+                  onChangeText={(text) => setName(capitalizeAfterSpaces(text))}
                   editable={!loading}
                   returnKeyType="next"
                   onSubmitEditing={() => emailRef.current?.focus()}
@@ -147,7 +172,17 @@ const RegisterScreen = () => {
                   placeholder="Nhập số điện thoại"
                   placeholderTextColor={colors.Neutral100}
                   value={phone}
-                  onChangeText={setPhone}
+                  onChangeText={(text) => {
+                    // Only allow digits, start with 0, max 10 characters
+                    let formatted = text.replace(/\D/g, ''); // Remove non-digits
+                    if (formatted.length > 0 && !formatted.startsWith('0')) {
+                      formatted = '0' + formatted.replace(/^0+/, ''); // Ensure starts with 0
+                    }
+                    if (formatted.length > 10) {
+                      formatted = formatted.slice(0, 10); // Limit to 10 digits
+                    }
+                    setPhone(formatted);
+                  }}
                   keyboardType="phone-pad" // Bàn phím số cho điện thoại
                   editable={!loading}
                   returnKeyType="next"

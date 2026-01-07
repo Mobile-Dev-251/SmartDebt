@@ -17,6 +17,10 @@ import { login } from "@/service/authService";
 import { storage } from "@/utils/storage";
 import { useDispatch, useSelector } from "react-redux";
 import { logIn } from "@/store/auth";
+import { registerForPushNotificationsAsync } from "@/utils/notifications";
+import { updatePushToken } from "@/service/userService";
+import { getMyNotifications } from "@/service/userService";
+import { setNotifications } from "@/store/notifications";
 
 const LoginScreen = () => {
   const dispatch = useDispatch();
@@ -37,47 +41,66 @@ const LoginScreen = () => {
         email: email,
         password: password,
       };
-      /*DEBUG SESSION*/
-      if (true){
-        try {
-          alert("Demo đăng nhập thành công");
-          dispatch(logIn({ user: 'demo_user', token: 'demo@user' }));
-          setLoading(false);
-          router.replace("/(tabs)/home"); 
-        } catch (error) {
-          setLoading(false);
-          alert("Đăng nhập thất bại");
-        }
-      }
-      else {
-      /*DEBUG SESSION*/
+
       const response = await login(userData);
       
       console.log('Login response:', response);
       
-      // Backend trả về: { status: 200, message: "...", data: { user: {...}, accessToken: "...", refreshToken: "..." } }
-      if (response && response.status === 200 && response.data) {
+      // Backend trả: { status: 200, message: "...", data: { user: {...}, accessToken: "...", refreshToken: "..." } }
+      // Axios interceptor return toàn bộ response như vậy
+      const isSuccess = response && response.data && response.data.user && response.data.accessToken;
+      const data = response.data || response;
+      console.log('Data:', data);
+      
+      if (isSuccess) {
         // Save accessToken to storage
-        if (response.data.accessToken) {
-          await storage.setToken(response.data.accessToken);
+        if (data.accessToken) {
+          await storage.setToken(data.accessToken);
+          console.log('Token saved:', data.accessToken);
         }
         
         // Save user data if available
-        if (response.data.user) {
-          await storage.setUser(response.data.user);
+        if (data.user) {
+          await storage.setUser(data.user);
+          console.log('User saved:', data.user);
+        }
+
+        // Dispatch to Redux FIRST (before navigating)
+        dispatch(logIn({ user: data.user, token: data.accessToken }));
+        
+        // Register for push notifications and update token
+        try {
+          const pushToken = await registerForPushNotificationsAsync();
+          if (pushToken) {
+            console.log('Updating push token:', pushToken);
+            await updatePushToken(pushToken);
+            console.log('Push token updated successfully');
+          }
+        } catch (error) {
+          console.error('Failed to register/update push token:', error);
         }
         
-        setLoading(false);
-        alert(response.message || "Đăng nhập thành công!");
+        // Fetch and update notifications
+        try {
+          console.log('Fetching notifications...');
+          const notificationsResponse = await getMyNotifications();
+          if (notificationsResponse.data) {
+            dispatch(setNotifications(notificationsResponse.data));
+            console.log('Notifications updated:', notificationsResponse.data.length);
+          }
+        } catch (error) {
+          console.error('Failed to fetch notifications:', error);
+        }
+        
+        console.log('Login successful, navigating to home');
+        // Điều hướng đến trang chính - KHÔNG cần alert vì đã có log
+        // Add a small delay to ensure Redux is updated before navigation
+        await new Promise(resolve => setTimeout(resolve, 100));
         router.replace("/(tabs)/home" as any);
-      } else if (response && response.status !== 200) {
-        alert(response.message || "Đăng nhập thất bại");
-        setLoading(false);
       } else {
-        alert(response?.message || "Đăng nhập thất bại. Vui lòng thử lại.");
         setLoading(false);
+        alert(response?.message || "Đăng nhập thất bại");
       }
-      } // REMEMBER TO REMOVE THIS BRACKET
     } catch (error: any) {
       setLoading(false);
       console.error('Login error:', error);

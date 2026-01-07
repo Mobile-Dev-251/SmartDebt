@@ -1,7 +1,7 @@
 import { spacingX } from '@/constants/theme';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import { router } from 'expo-router';
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState, useCallback } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -13,7 +13,10 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { SearchContext } from './transaction';
+import { SearchContext } from './transaction'; // Đảm bảo đường dẫn import đúng
+import { getAllContacts } from '@/service/contactsService';
+import { useFocusEffect } from '@react-navigation/native';
+// Đã xóa các import không cần thiết: debtsService, groupsService
 
 interface InfoItem {
   id: string,
@@ -29,19 +32,65 @@ const SavedScreen = () => {
   const searchText = useContext(SearchContext);
   const [fullData, setFullData] = useState<SectionData[]>([]);
   const [displayData, setDisplayData] = useState<SectionData[]>([]);
-
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchData = () => {
-    // TODO: Replace with actual API call
-    setFullData([]);    
-    setDisplayData([]); 
-    setIsLoading(false);
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+      // --- CHỈ LẤY DANH SÁCH LIÊN HỆ ĐÃ LƯU ---
+      // Không gọi getMyGroups hay getAllDebts nữa -> App sẽ nhanh hơn hẳn
+      const response: any = await getAllContacts();
+      const contacts = Array.isArray(response) ? response : (response.data || response.contacts || []);
+      
+      const groupedData: { [key: string]: InfoItem[] } = {};
+
+      if (Array.isArray(contacts)) {
+        contacts.forEach((contact: any) => {
+          const displayName = contact.name;
+          const targetId = contact.user_id_contact || contact.id;
+
+          // --- BỘ LỌC QUAN TRỌNG ---
+          // Chỉ hiện những người có tên đàng hoàng.
+          // Nếu tên rỗng, null, hoặc "Không tên" -> Bỏ qua luôn (Không hiện User 9)
+          if (!displayName || displayName === "Không tên" || displayName.trim() === "") {
+             return; 
+          }
+
+          // Phân nhóm theo chữ cái đầu (A, B, C...)
+          const firstLetter = displayName.charAt(0).toUpperCase();
+          const groupKey = /^[A-ZÀ-Ỹ]$/i.test(firstLetter) ? firstLetter : '#';
+
+          if (!groupedData[groupKey]) {
+            groupedData[groupKey] = [];
+          }
+          
+          groupedData[groupKey].push({
+            id: targetId ? String(targetId) : String(contact.id), 
+            name: displayName
+          });
+        });
+      }
+
+      // Sắp xếp các nhóm A -> Z
+      const sections: SectionData[] = Object.keys(groupedData).sort().map(key => ({
+        title: key,
+        data: groupedData[key]
+      }));
+
+      setFullData(sections);
+      setDisplayData(sections);
+    } catch (error) {
+      console.error("Error fetching contacts:", error);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [])
+  );
 
   useEffect(() => {
     if (!searchText || searchText.trim() === '') {
@@ -63,10 +112,20 @@ const SavedScreen = () => {
   }, [searchText, fullData]);
 
   const renderInfoItem = ({ item }: { item: InfoItem }) => {
-
     return (
       <TouchableOpacity 
         style={styles.itemContainer}
+        onPress={()=>
+        {
+          router.push({
+            pathname: '/trans_user_profile/[id]',
+            params: {
+              id: item.id,
+              name: item.name,
+              type: 'user'
+            } 
+          })
+        }}
       >
         <View style={styles.avatarContainer}>
             <Image 
@@ -75,23 +134,12 @@ const SavedScreen = () => {
             />
         </View>
         <View style={styles.infoContainer}>
-          <Text style={styles.nameText}> {item.name} </Text>
-          <TouchableOpacity 
-            onPress={()=>
-            {
-              router.push({
-                pathname: '/trans_user_profile/[id]',
-                params: {
-                  id: item.id,
-                  name: item.name,
-                  type: 'user'
-                } 
-              })
-            }}> 
+          <Text style={styles.nameText}>{item.name}</Text>
+          <View> 
             <Text style={styles.noteText}>
               Giao dịch gần đây {'>'}
             </Text>
-          </TouchableOpacity>
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -103,7 +151,7 @@ const SavedScreen = () => {
         <View style= {{flex: 1, backgroundColor: '#2F2E2E'}}>
           {
             isLoading? (
-              <ActivityIndicator></ActivityIndicator>
+              <ActivityIndicator size="large" color="#3275F1" style={{marginTop: 20}} />
             ) : (
               <SectionList 
                 stickySectionHeadersEnabled = {false}
@@ -116,7 +164,7 @@ const SavedScreen = () => {
                 )}
                 ListEmptyComponent={() => (
                     <Text style={{color: 'white', textAlign: 'center', marginTop: 20}}>
-                        Không tìm thấy kết quả
+                        Chưa có liên hệ nào được lưu
                     </Text>
                 )}
               />
@@ -142,33 +190,60 @@ export default SavedScreen
 
 const styles = StyleSheet.create({
   itemContainer: {
-    marginHorizontal: Dimensions.get('window').width * 0.08,
-    marginTop: Dimensions.get('window').width * 0.04,
+    marginHorizontal: Dimensions.get('window').width * 0.05,
+    marginTop: 15,
+    marginBottom: 5,
     flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#3E3E3E',
+    padding: 10,
+    borderRadius: 12
   },
   sectionHeader: {
-    marginHorizontal: Dimensions.get('window').width * 0.08,
-    marginTop: Dimensions.get('window').height * 0.023,
-    fontWeight: 'semibold',
-    color: '#FFFFFF',
-    fontSize: 20
+    marginHorizontal: Dimensions.get('window').width * 0.05,
+    marginTop: 20,
+    fontWeight: '600',
+    color: '#8A8A8A',
+    fontSize: 16
   },
   avatarContainer: { marginRight: 15 },
-  avatar: { width: Dimensions.get('window').width * 0.14, height: Dimensions.get('window').height * 0.08, borderRadius: 20, backgroundColor: '#FFF' },
-  infoContainer: {
-    flexDirection: 'column'
+  avatar: { 
+    width: Dimensions.get('window').width * 0.12, 
+    height: Dimensions.get('window').width * 0.12,
+    borderRadius: 20, 
+    backgroundColor: '#FFF' 
   },
-  nameText: { color: '#FFF', fontFamily: 'Roboto', fontWeight: 'medium', fontSize: 20 },
-  noteText: { color: '#A0A0A0', fontFamily: 'Roboto', fontWeight: 'light', fontSize: 13, marginTop: 4 },
+  infoContainer: {
+    flexDirection: 'column',
+    flex: 1
+  },
+  nameText: { 
+    color: '#FFF', 
+    fontFamily: 'Roboto', 
+    fontWeight: '500', 
+    fontSize: 16 
+  },
+  noteText: { 
+    color: '#A0A0A0', 
+    fontFamily: 'Roboto', 
+    fontWeight: '300', 
+    fontSize: 13, 
+    marginTop: 4 
+  },
   addNew:   {
     position: 'absolute', 
     backgroundColor: '#3275F1', 
     width: 60, 
     height: 60, 
-    borderRadius: 100, 
-    right: spacingX._15,
+    borderRadius: 30, 
+    right: 20,
     bottom: 30,
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
   }
 })

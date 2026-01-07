@@ -14,13 +14,19 @@ const getHostIP = () => {
 const IP = getHostIP();
 
 // Use environment variable or fallback to local IP
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || `http://wrongurl:3000`;
+// Nếu có EXPO_PUBLIC_API_URL thì dùng, không thì dùng IP từ Expo hoặc localhost
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || (IP ? `http://${IP}:3000` : `http://localhost:3000`);
+
+// Log BASE_URL for debugging
+console.log("API Base URL:", BASE_URL);
+console.log("Detected IP:", IP);
 
 const instance = axios.create({
   baseURL: BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
+  timeout: 10000, // 10 seconds timeout
 });
 
 // Request interceptor: Add token to headers
@@ -51,7 +57,20 @@ instance.interceptors.response.use(
       }
       return Promise.reject(error.response.data || error.response);
     }
-    return Promise.reject({ message: "Network error", error });
+    // Network error - no response from server
+    if (error.request) {
+      console.error("Network Error - No response:", {
+        message: error.message,
+        code: error.code,
+        baseURL: BASE_URL,
+      });
+      return Promise.reject({ 
+        message: `Không thể kết nối đến server. Vui lòng kiểm tra lại kết nối mạng hoặc địa chỉ server: ${BASE_URL}`, 
+        error: error.message,
+        code: error.code 
+      });
+    }
+    return Promise.reject({ message: "Network error", error: error.message });
   }
 );
 

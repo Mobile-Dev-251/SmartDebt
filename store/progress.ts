@@ -25,9 +25,16 @@ const session = createSlice({
     initialState: initialProgress,
     reducers: {
         setCurrentRoute(state, action: PayloadAction<{pageId: string | null; user?: UserProfile | null}>) {
-            if (state.currentRoute !== action.payload.pageId) {
+            const mainTabs = ['home', 'recent', 'saved', 'group', 'statistic', 'profile'];
+            const isMainTab = action.payload.pageId && mainTabs.includes(action.payload.pageId);
+            
+            if (isMainTab && state.currentRoute !== action.payload.pageId) {
                 state.prevRoute = state.currentRoute;
                 state.currentRoute = action.payload.pageId;
+            } else if (!isMainTab) {
+                // Nếu không phải main tab, chỉ cập nhật prevRoute
+                state.prevRoute = state.currentRoute;
+                // Không cập nhật currentRoute
             }
             state.user = action.payload.user ?? null;
         },
@@ -43,9 +50,15 @@ const session = createSlice({
             state.prevRoute = null;
             state.user = null;
             state.pageProgress = {};
+        },
+        validateCurrentRoute(state) {
+            const mainTabs = ['home', 'recent', 'saved', 'group', 'statistic', 'profile'];
+            if (!state.currentRoute || !mainTabs.includes(state.currentRoute)) {
+                state.currentRoute = 'home';
+            }
         }
     }
  })
 
-export const { setCurrentRoute, updatePageProgress, clearPageProgress, clearSession } = session.actions;
+export const { setCurrentRoute, updatePageProgress, clearPageProgress, clearSession, validateCurrentRoute } = session.actions;
 export default session.reducer;

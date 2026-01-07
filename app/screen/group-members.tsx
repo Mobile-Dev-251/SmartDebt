@@ -1,20 +1,36 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, Image, SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Dimensions, Image, SectionList, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDispatch } from 'react-redux';
 import { setCurrentRoute } from '@/store/progress';
+import { getGroupMembers, getGroupHistoryExpenses } from '@/service/groupsService';
+import { borrowerConfirmDebt, markDebtAsPaid } from '@/service/debtsService';
+import { getAllDebts } from '@/service/debtsService';
+import { storage } from '@/utils/storage';
 
 interface Member {
   id: string;
   name: string;
-  lastTransaction?: string;
+  balance: number;
+}
+
+interface HistoryItem {
+  id: string;
+  description: string;
+  total_amount: number;
+  created_at: string;
+  status?: string;
+  isLender?: boolean;
+  isBorrower?: boolean;
+  borrower_name?: string;
+  lender_name?: string;
 }
 
 interface SectionData {
   title: string;
-  data: Member[];
+  data: (Member | HistoryItem)[];
 }
 
 const screen_width  = Dimensions.get('window').width
@@ -29,6 +45,7 @@ const GroupMembersScreen = () => {
 
   const [isLoading, setIsLoading] = useState(true);
   const [sections, setSections] = useState<SectionData[]>([]);
+  const [history, setHistory] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -48,13 +65,63 @@ const GroupMembersScreen = () => {
     }
 
     try {
-      // Replace URL with your backend endpoint
-      const res = await fetch(`https://your-backend.example.com/api/groups/${groupId}/members`);
-      if (!res.ok) throw new Error('Fetch failed');
-      const data = await res.json();
-      // expected data shape: [{ id, name, lastTransaction? }, ...]
-      setSections([{ title: 'Thành viên', data }]);
+      const storedUser = await storage.getUser();
+      const currentUserId = storedUser?.id;
+
+      const [membersRes, debtsRes, groupDebtsRes]: [any, any, any] = await Promise.all([
+          getGroupMembers(Number(groupId)),
+          getAllDebts(),
+          getAllDebts() // or a new service for group debts
+      ]);
+
+      const members = Array.isArray(membersRes) ? membersRes : membersRes?.data || [];
+      const debts = Array.isArray(debtsRes) ? debtsRes : debtsRes?.data || [];
+      const groupDebts = debts.filter((d: any) => d.group_expense_id);
+
+      // Calculate balance for each member relative to ME within this group context
+      const membersWithBalance = members.map((m: any) => {
+          let balance = 0;
+          
+          if (currentUserId) {
+              debts.forEach((d: any) => {
+                  // Only count outstanding group debts
+                  const isOutstanding = d.status === 'OPEN' || d.status === 'PENDING_CONFIRMATION_BY_LENDER';
+                  const isGroupDebt = d.type === 'NỢ NHÓM' || d.group_expense_id; // Check if related to group
+                  
+                  if (isOutstanding && isGroupDebt) {
+                      if (d.lender_id === currentUserId && d.borrower_id === m.id) {
+                          balance += Number(d.amount); // They owe me
+                      } else if (d.borrower_id === currentUserId && d.lender_id === m.id) {
+                          balance -= Number(d.amount); // I owe them
+                      }
+                  }
+              });
+          }
+
+          return {
+              id: String(m.id),
+              name: m.name || String(m.id),
+              balance: balance
+          };
+      });
+
+      setSections([
+        { title: 'Thành viên', data: membersWithBalance },
+        { title: 'Giao dịch gần đây', data: groupDebts.map((d: any) => ({
+          id: d.id.toString(),
+          description: d.note || 'Giao dịch nhóm',
+          total_amount: d.amount,
+          created_at: d.created_at,
+          status: d.status,
+          isLender: currentUserId === d.lender_id,
+          isBorrower: currentUserId === d.borrower_id,
+          borrower_name: d.borrower_name,
+          lender_name: d.lender_name
+        })) }
+      ]);
+
     } catch (err) {
+      console.error(err);
       setError('Không thể tải dữ liệu thành viên.');
       setSections([]);
     } finally {
@@ -72,15 +139,65 @@ const GroupMembersScreen = () => {
     });
   };
 
-  const renderItem = ({ item }: { item: Member }) => (
-    <TouchableOpacity style={styles.memberRow} onPress={() => openMember(item)}>
-      <Image source={require('../../assets/images/avatar.png')} style={styles.avatar} />
-      <View style={{ flex: 1 }}>
-        <Text style={styles.memberName}>{item.name}</Text>
-        <Text style={styles.memberSub}>{item.lastTransaction || ''} {'>'}</Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const handleConfirm = async (debtId: string, isBorrowerConfirm: boolean) => {
+    try {
+      if (isBorrowerConfirm) {
+        await borrowerConfirmDebt(Number(debtId));
+        Alert.alert('Thành công', 'Đã gửi yêu cầu xác nhận.');
+      } else {
+        await markDebtAsPaid(Number(debtId));
+        Alert.alert('Thành công', 'Đã xác nhận nhận tiền.');
+      }
+      // Refresh data
+      fetchMembers();
+    } catch (error) {
+      Alert.alert('Lỗi', 'Có lỗi xảy ra.');
+    }
+  };
+
+  const renderItem = ({ item }: { item: any }) => {
+    if ('balance' in item) {
+      // Member
+      let balanceText = "Đã thanh toán";
+      let balanceColor = "#A0A0A0"; // Grey
+
+      if (item.balance > 0) {
+          balanceText = `Họ nợ bạn: ${item.balance.toLocaleString('vi-VN')}đ`;
+          balanceColor = "#4CAF50"; // Green
+      } else if (item.balance < 0) {
+          balanceText = `Bạn nợ họ: ${Math.abs(item.balance).toLocaleString('vi-VN')}đ`;
+          balanceColor = "#F44336"; // Red
+      }
+
+      return (
+        <TouchableOpacity style={styles.memberRow} onPress={() => openMember(item)}>
+          <Image source={require('../../assets/images/avatar.png')} style={styles.avatar} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.memberName}>{item.name}</Text>
+            <Text style={[styles.memberSub, { color: balanceColor }]}>{balanceText} {'>'}</Text>
+          </View>
+        </TouchableOpacity>
+      );
+    } else {
+      // Transaction
+      const canConfirm = item.status === 'OPEN' && item.isBorrower;
+      const canMarkPaid = item.status === 'PENDING_CONFIRMATION_BY_LENDER' && item.isLender;
+      const displayName = item.isLender ? item.borrower_name : item.lender_name;
+      return (
+        <View style={styles.memberRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.memberName}>{displayName}</Text>
+            <Text style={styles.memberSub}>{item.total_amount.toLocaleString('vi-VN')}đ - {new Date(item.created_at).toLocaleDateString('vi-VN')}</Text>
+          </View>
+          {(canConfirm || canMarkPaid) && (
+            <TouchableOpacity style={styles.confirmButton} onPress={() => handleConfirm(item.id, canConfirm)}>
+              <Text style={styles.confirmButtonText}>{canConfirm ? 'Xác nhận trả' : 'Xác nhận nhận'}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      );
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -96,7 +213,7 @@ const GroupMembersScreen = () => {
         <Text style={styles.sectionTitle}>Thành viên</Text>
         {isLoading ? (
           <View style={{ flex: 1, justifyContent: 'center' }}>
-            <ActivityIndicator style={{ marginTop: 20 }} />
+            <ActivityIndicator style={{ marginTop: 20 }} color="#FFF"/>
           </View>
         ) : error ? (
           <View style={{ flex: 1 }}>
@@ -108,9 +225,6 @@ const GroupMembersScreen = () => {
             sections={sections}
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
-            // renderSectionHeader={({ section: { title } }) => (
-            //   <Text style={styles.sectionHeader}>{title}</Text>
-            // )}
             ListEmptyComponent={() => <Text style={{ color: '#fff' }}>Không có thành viên</Text>}
             contentContainerStyle={{ paddingBottom: 140 }}
           />
@@ -119,7 +233,7 @@ const GroupMembersScreen = () => {
       </View>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.addBtn} onPress={() => {}}>
+        <TouchableOpacity style={styles.addBtn} onPress={() => Alert.alert("Thông báo", "Chức năng thêm thành viên đang phát triển")}>
           <Text style={{ color: '#fff', fontWeight: 'bold', fontFamily: 'Roboto', fontSize: 20 }}>Thêm thành viên</Text>
         </TouchableOpacity>
       </View>
@@ -191,14 +305,13 @@ const styles = StyleSheet.create({
     flex: 1, 
     backgroundColor: '#242323'
   },
-  addBtn: { 
+  confirmButton: { 
     backgroundColor: '#3875F6', 
-    padding: 14, 
-    borderRadius: 10, 
-    marginVertical: 7, 
-    alignItems: 'center', 
-    alignSelf: 'center',
-    height: 52 ,
-    width: screen_width * 0.7295
-  }
+    padding: 8, 
+    borderRadius: 5 
+  },
+  confirmButtonText: { 
+    color: '#fff', 
+    fontSize: 12 
+  },
 });

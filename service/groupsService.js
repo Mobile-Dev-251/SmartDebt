@@ -47,6 +47,15 @@ export const createGroupExpense = async (groupId, expenseData) => {
 };
 
 /**
+ * Lấy chi tiết khoản chi tiêu nhóm
+ * @param {number} expenseId - ID của khoản chi tiêu
+ * @returns {Promise}
+ */
+export const getGroupExpenseDetail = async (expenseId) => {
+  return axios.get(`/groups/expense/${expenseId}`);
+};
+
+/**
  * Rời khỏi nhóm
  * @param {number} groupId - ID của nhóm
  * @returns {Promise}
@@ -63,6 +72,10 @@ export const leaveGroup = async (groupId) => {
 export const getGroupHistoryExpenses = async (groupId) => {
   return axios.get(`/groups/${groupId}/history-expenses`);
 };
+
+
+
+
 
 
 

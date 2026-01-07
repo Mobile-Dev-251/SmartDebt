@@ -3,16 +3,18 @@ import { combineReducers, configureStore } from '@reduxjs/toolkit'
 import { FLUSH, PAUSE, PERSIST, persistReducer, persistStore, PURGE, REGISTER, REHYDRATE } from 'redux-persist'
 import authStore from './auth'
 import progressStore from './progress'
+import notificationsStore from './notifications'
 
 const rootReducer = combineReducers({
     auth: authStore,
     progress: progressStore,
+    notifications: notificationsStore,
 })
 
 const persistConfig = {
     key: 'root',
     storage: AsyncStorage,
-    whitelist: ['progress', 'auth'],
+    whitelist: ['progress', 'auth', 'notifications'],
 }
 
 const persistedReducer = persistReducer(persistConfig, rootReducer)

@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Checkbox from 'expo-checkbox';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   AppState,
   KeyboardAvoidingView,
   Platform,
@@ -12,24 +13,30 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  ActivityIndicator,
 } from 'react-native';
 import { Dropdown } from 'react-native-element-dropdown';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { shallowEqual, useDispatch, useSelector } from 'react-redux';
 import { clearPageProgress, setCurrentRoute, updatePageProgress } from '../../store/progress';
+import { createDebt, getAllDebts } from '@/service/debtsService';
+import { getMyGroups, createGroupExpense, getGroupMembers } from '@/service/groupsService';
+import { getAllContacts, findUserByPhone, createContactByPhone } from '@/service/contactsService'; 
+import { storage } from '@/utils/storage';
 
-
-const addTransactionScreen = () => {
+const AddTransactionScreen = () => {
   const PAGE_ID = 'add-transaction'
   const router = useRouter();
   const params = useLocalSearchParams();
   const dispatch = useDispatch();
+  const auth = useSelector((state: any) => state.auth);
   
   const saved = useSelector((s:any) => (s.progress?.pageProgress?.[PAGE_ID]) || {}, shallowEqual);
 
-  const [userName, setUserName] = useState((params.userName as string) || saved.userName || "");
+  const [userName, setUserNameStr] = useState(String(params.userName || saved.userName || ""));
   const [userType, setUserType] = useState((params.type as string) || saved.userType || "");
+  const [borrowerId, setBorrowerId] = useState<string | null>((params.id as string) || null);
   const [isSaved, setSaved] = useState(saved.isSaved ?? true);
   const [isRepeat, setRepeat] = useState(saved.isRepeat ?? false);
   const [amount, setAmount] = useState(saved.amount ?? "50000");
@@ -39,12 +46,28 @@ const addTransactionScreen = () => {
   const [reminder, setReminder] = useState(saved.reminder ?? "1_day");
   const [date, setDate] = useState(saved.date ? new Date(saved.date) : new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // keep latest values in ref for flushing on background
+  const [groups, setGroups] = useState<any[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<any>(null);
+
+  const [contacts, setContacts] = useState<any[]>([]);
+  const [filteredContacts, setFilteredContacts] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  const [phone, setPhone] = useState(saved.phone || "");
+  const [isSaveContact, setIsSaveContact] = useState(saved.isSaveContact ?? false);
+  const [showPhoneInput, setShowPhoneInput] = useState(false);
+
+  // Helper function to capitalize
+  const capitalizeAfterSpaces = (text: string) => {
+    return text.replace(/(\s|^)\w/g, (match) => match.toUpperCase());
+  };
+
   const latestRef = useRef<any>({});
   useEffect(() => {
-    latestRef.current = { userName, userType, isSaved, isRepeat, amount, note, type, reminder, date: date.toISOString() }
-  }, [userName, userType, isSaved, isRepeat, amount, note, type, reminder, date])
+    latestRef.current = { userName, userType, isSaved, isRepeat, amount, note, type, reminder, date: date.toISOString(), phone, isSaveContact }
+  }, [userName, userType, isSaved, isRepeat, amount, note, type, reminder, date, phone, isSaveContact])
 
   // debounce save
   const saveTimeout = useRef<any>(null);
@@ -56,35 +79,152 @@ const addTransactionScreen = () => {
   }, [])
 
   useEffect(() => {
-    // schedule save whenever any field changes
     scheduleSave();
     return () => { if (saveTimeout.current) clearTimeout(saveTimeout.current) };
-  }, [userName, userType, isSaved, isRepeat, amount, note, type, reminder, date, scheduleSave])
+  }, [userName, userType, isSaved, isRepeat, amount, note, type, reminder, date, phone, isSaveContact, scheduleSave])
 
-  // AppState listener to flush on background
   useEffect(() => {
     const onStateChange = (nextState: string) => {
       if (nextState === 'background' || nextState === 'inactive') {
         dispatch(updatePageProgress({ pageId: PAGE_ID, data: latestRef.current }))
-        dispatch(setCurrentRoute({pageId: '/screen/add-transaction'}))
+        // Không lưu currentRoute cho screen này
       }
     };
     const sub = AppState.addEventListener('change', onStateChange);
     return () => sub.remove();
   }, [])
 
-  // mark current route while on this screen
   useEffect(() => {
-    dispatch(setCurrentRoute({pageId: PAGE_ID}));
+    // Không lưu currentRoute cho screen này
     return () => { 
       dispatch(clearPageProgress(PAGE_ID))
     };
   }, [])
 
+  useFocusEffect(
+    useCallback(() => {
+      if (type === 'chi') {
+        const fetchGroups = async () => {
+          try {
+            const response: any = await getMyGroups();
+            const groupsList = Array.isArray(response) ? response : (response.data || response.groups || []);
+            setGroups(groupsList);
+          } catch (error) {
+            console.error('Error fetching groups:', error);
+          }
+        };
+        fetchGroups();
+      }
+    }, [type])
+  );
+
+  useEffect(() => {
+    const fetchContacts = async () => {
+      try {
+        const userMap: {[key: string]: string} = {};
+
+        // 1. Fetch Group Members
+        try {
+            const groupsRes: any = await getMyGroups();
+            const groups = Array.isArray(groupsRes) ? groupsRes : (groupsRes?.data || groupsRes?.groups || []);
+            if (Array.isArray(groups) && groups.length > 0) {
+                const memberPromises = groups.map((g: any) => getGroupMembers(g.id).catch(() => null));
+                const results = await Promise.all(memberPromises);
+                results.forEach((res: any) => {
+                    const members = Array.isArray(res) ? res : (res?.data || []);
+                    if (Array.isArray(members)) {
+                        members.forEach((m: any) => {
+                            if (m.id && m.name) userMap[String(m.id)] = m.name;
+                        });
+                    }
+                });
+            }
+        } catch (e) {}
+
+        // 2. Fetch Debts
+        try {
+            const debtsRes: any = await getAllDebts();
+            const debts = Array.isArray(debtsRes) ? debtsRes : debtsRes?.data || [];
+            if (Array.isArray(debts)) {
+                debts.forEach((d: any) => {
+                   if (d.borrower_id && d.borrower_name) userMap[String(d.borrower_id)] = d.borrower_name;
+                   if (d.lender_id && d.lender_name) userMap[String(d.lender_id)] = d.lender_name;
+                });
+            }
+        } catch (e) {}
+
+        // 3. Fetch Contacts
+        const response: any = await getAllContacts();
+        const rawContacts = Array.isArray(response) ? response : (response.data || response.contacts || []);
+        
+        const enrichedContacts = rawContacts.map((c: any) => {
+             const targetId = c.user_id_contact || c.id;
+             const name = c.name || userMap[String(targetId)] || String(targetId);
+             
+             return {
+                 ...c,
+                 name: name,
+                 id: targetId 
+             };
+        });
+
+        setContacts(enrichedContacts);
+      } catch (error) {
+        console.error('Error fetching contacts:', error);
+      }
+    };
+    fetchContacts();
+  }, []);
+
+  // Handle group transaction initialization
+  useEffect(() => {
+    const initializeGroupTransaction = async () => {
+      if (params.type === 'group' && params.userId) {
+        try {
+          // Fetch groups to find the selected group
+          const response: any = await getMyGroups();
+          const groupsList = Array.isArray(response) ? response : (response.data || response.groups || []);
+          setGroups(groupsList);
+
+          // Find and select the group
+          const group = groupsList.find((g: any) => String(g.id) === String(params.userId));
+          if (group) {
+            setSelectedGroup(group);
+            // For group transactions, userName should be the payer's name
+            // Leave it empty or set to current user as default payer
+            const storedUser = await storage.getUser();
+            if (storedUser && storedUser.name) {
+              setUserNameStr(storedUser.name); // Default to current user as payer
+            }
+          }
+        } catch (error) {
+          console.error('Error initializing group transaction:', error);
+        }
+      }
+    };
+
+    initializeGroupTransaction();
+  }, [params.type, params.userId]);
+
+  useEffect(() => {
+    if (userName && typeof userName === 'string' && userName.trim()) {
+      const filtered = contacts.filter(contact =>
+        contact.name && contact.name.trim() && contact.name.toLowerCase().includes(userName.toLowerCase())
+      );
+      setFilteredContacts(filtered);
+      setShowSuggestions(filtered.length > 0 && !borrowerId);
+      setShowPhoneInput(filtered.length === 0 && userName.trim() !== "");
+    } else {
+      setFilteredContacts([]);
+      setShowSuggestions(false);
+      setShowPhoneInput(false);
+    }
+  }, [userName, contacts, borrowerId]); 
+
   const typeData = [
-    { label: 'Mượn nợ', value: 'muon' },
-    { label: 'Cho mượn', value: 'cho_muon' },
-    { label: 'Khoản chi nhóm', value: 'chi'}
+    { label: 'Mượn nợ', value: 'muon' }, // Người kia nợ mình
+    { label: 'Cho mượn', value: 'cho_muon' }, // Mình nợ người kia (hoặc người kia cho mình mượn)
+    { label: 'Khoản chi nhóm', value: 'chi'} // Người kia trả tiền cho nhóm
   ];
 
   const reminderData = [
@@ -99,16 +239,219 @@ const addTransactionScreen = () => {
     if (selectedDate) setDate(selectedDate);
   };
 
-  const onSubmit = async () => {
-    try {
-      // Call API
-      dispatch(clearPageProgress(PAGE_ID))
-      dispatch(setCurrentRoute({pageId: null}))
-      router.push('/(tabs)/home')
-    } catch (err) {
-      // handle error
-      console.warn('submit error', err)
+  const mapReminderToDays = (reminderValue: string): number => {
+    switch (reminderValue) {
+      case '1_day': return 1;
+      case '3_days': return 3;
+      case '1_week': return 7;
+      case '1_month': return 30;
+      default: return 1;
     }
+  };
+
+  const onSubmit = async () => {
+    if (!userName || typeof userName !== 'string' || !userName.trim()) {
+      Alert.alert("Lỗi", "Vui lòng nhập họ và tên");
+      return;
+    }
+
+    if (!amount.trim() || isNaN(Number(amount.replace(/[^\d]/g, '')))) {
+      Alert.alert("Lỗi", "Vui lòng nhập số tiền hợp lệ");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const storedUser = await storage.getUser();
+      if (!storedUser || !storedUser.id) {
+        Alert.alert("Lỗi", "Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.");
+        setIsSubmitting(false);
+        return;
+      }
+      const currentUserId = storedUser.id;
+      const currentUserName = storedUser.name || "";
+
+      // --- LOGIC TÌM ID CỦA NGƯỜI ĐƯỢC ĐIỀN TÊN (TARGET) ---
+      let targetUserId: number | null = borrowerId ? Number(borrowerId) : null;
+
+      // 1. Thử tìm trong danh bạ khớp tên
+      if (!targetUserId && userName && typeof userName === 'string' && userName.trim()) {
+         const exactMatch = contacts.find(c => c.name.toLowerCase() === userName.trim().toLowerCase());
+         if (exactMatch) targetUserId = exactMatch.id;
+      }
+
+      // 2. Thử tìm bằng số điện thoại trong danh bạ
+      if (!targetUserId && phone.trim()) {
+           const phoneMatch = contacts.find(c => c.phone === phone.trim());
+           if (phoneMatch) targetUserId = phoneMatch.id;
+      }
+
+      // 3. GỌI API TÌM TRÊN SERVER
+      if (!targetUserId && phone.trim()) {
+          try {
+              const searchRes: any = await findUserByPhone(phone.trim());
+              const foundUsers = Array.isArray(searchRes) ? searchRes : (searchRes?.data || []);
+              
+              if (foundUsers.length > 0) {
+                  const serverUser = foundUsers[0]; 
+                  targetUserId = serverUser.id;
+                  
+                  // Cập nhật tên hiển thị
+                  const realName = serverUser.name || serverUser.full_name || userName;
+                  setUserNameStr(realName);
+                  
+                  console.log(`Tìm thấy: ${realName} (ID: ${targetUserId})`);
+              }
+          } catch (e) {
+              console.log("API search failed:", e);
+          }
+      }
+
+      // 4. Check chính mình (Nếu tên nhập vào là chính mình)
+      if (!targetUserId && userName.toLowerCase() === currentUserName.toLowerCase()) {
+         targetUserId = currentUserId;
+      }
+
+      // --- CHECK LẦN CUỐI ---
+      if (!targetUserId) {
+          Alert.alert(
+              "Không tìm thấy tài khoản",
+              `Số điện thoại ${phone} chưa đăng ký hoặc không tồn tại.`,
+              [ { text: "Đã hiểu" } ]
+          );
+          setIsSubmitting(false);
+          return;
+      }
+
+      const amountNumber = Number(amount.replace(/[^\d]/g, ''));
+      const remindBeforeDays = mapReminderToDays(reminder);
+      const dueDate = date.toISOString().split('T')[0];
+
+      // ============================================
+      // LOGIC XỬ LÝ THEO LOẠI GIAO DỊCH
+      // ============================================
+
+      // A. CHI TIÊU NHÓM: Target User là người Trả tiền (Payer)
+      // A. CHI TIÊU NHÓM: Target User là người Trả tiền (Payer)
+      if (type === 'chi') {
+        if (!selectedGroup) {
+          Alert.alert("Lỗi", "Vui lòng chọn nhóm để tạo khoản chi.");
+          setIsSubmitting(false);
+          return;
+        }
+
+        // --- BỔ SUNG LOGIC LẤY THÀNH VIÊN ---
+        let involvedMemberIds: number[] = [];
+        try {
+            // Gọi API lấy danh sách thành viên mới nhất của nhóm đó
+            const membersRes: any = await getGroupMembers(selectedGroup.id);
+            const membersList = Array.isArray(membersRes) ? membersRes : (membersRes?.data || []);
+            
+            // Lấy ra mảng các ID thành viên
+            involvedMemberIds = membersList.map((m: any) => m.id);
+
+            // Kiểm tra an toàn: Đảm bảo người trả tiền (Payer) cũng có trong danh sách chia tiền
+            if (targetUserId && !involvedMemberIds.includes(targetUserId)) {
+                involvedMemberIds.push(targetUserId);
+            }
+        } catch (e) {
+            console.error("Lỗi lấy thành viên nhóm:", e);
+            Alert.alert("Lỗi", "Không thể lấy danh sách thành viên nhóm.");
+            setIsSubmitting(false);
+            return;
+        }
+        // -------------------------------------
+
+        const expenseData = {
+          totalAmount: amountNumber,
+          due_date: dueDate,
+          remind_before: remindBeforeDays,
+          description: note.trim() || null,
+          payer_id: targetUserId, 
+          
+          // GỬI THÊM TRƯỜNG NÀY XUỐNG BACKEND
+          // Backend sẽ dùng mảng này để tính: amount_per_person = totalAmount / involved_members.length
+          involved_members: involvedMemberIds, 
+        };
+
+        const response = await createGroupExpense(selectedGroup.id, expenseData);
+        if (response && (response.expense_id || response.status === 200)) {
+           handleSuccess(response.expense_id);
+        } else {
+           throw new Error("Lỗi server (Group)");
+        }
+        return;
+      }
+
+      // B. GIAO DỊCH CÁ NHÂN (MƯỢN / CHO MƯỢN)
+      // Backend sẽ tự động set lender/borrower dựa trên type
+      
+      if (targetUserId === currentUserId) {
+        Alert.alert("Lỗi", "Không thể tạo giao dịch với chính mình");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const debtData: any = {
+        borrower_id: targetUserId, // Luôn là targetUserId, backend sẽ xử lý vai trò dựa trên type
+        type: type, 
+        amount: amountNumber,
+        due_date: dueDate,
+        remind_before: remindBeforeDays,
+        note: note.trim() || null,
+        isSaved: isSaved,
+      };
+
+      let transactionTitle = userName;
+      if (note.trim()) transactionTitle += ` - ${note.trim()}`;
+      debtData.title = transactionTitle;
+
+      const response = await createDebt(debtData);
+      if (response && response.debt_id) {
+        // Lưu contact nếu được yêu cầu (chỉ lưu nếu Target là người mới)
+        if (isSaveContact && phone && phone.trim() && targetUserId !== currentUserId) {
+          try {
+            await createContactByPhone({ phone: phone.trim(), name: userName.trim() });
+          } catch (e) {
+            console.log("Failed to save contact:", e);
+          }
+        }
+        handleSuccess(response.debt_id);
+      } else {
+        throw new Error("Lỗi server (Debt)");
+      }
+
+    } catch (err: any) {
+      console.error('Submit error:', err);
+      const errorMessage = err?.message || err?.error || "Lỗi tạo giao dịch.";
+      Alert.alert("Lỗi", errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  const handleSuccess = (id: any) => {
+    Alert.alert("Thành công", "Tạo giao dịch thành công!", [
+        {
+          text: "OK",
+          onPress: () => {
+            dispatch(clearPageProgress(PAGE_ID));
+            dispatch(setCurrentRoute({ pageId: null }));
+            // Dùng setTimeout để tránh lỗi điều hướng
+            setTimeout(() => {
+                if (id) {
+                     router.push({
+                        pathname: '/transaction-detail',
+                        params: { id: id }
+                      });
+                } else {
+                    router.push('/(tabs)/home');
+                }
+            }, 100);
+          }
+        }
+    ]);
   }
 
   return (
@@ -116,38 +459,68 @@ const addTransactionScreen = () => {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.headerContainer}>
           <TouchableOpacity style={styles.backButton} onPress={() => {
-            if (router.canGoBack()) {
-              router.back()
-              return;
-            }
-
-            router.push({
-              pathname: '/(tabs)/transaction',
-              params: { tab: 'recent' }
-            } as any);
-            }
-          }>
+            router.push('/(tabs)/transaction?tab=recent');
+          }}>
             <Ionicons name="chevron-back-outline" size={30} color="#FFFFFF"/>
           </TouchableOpacity>
           <Text style={styles.header}>Tạo mới giao dịch</Text>
           <View style={styles.infoButton} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Họ và tên */}
-          <View style={styles.inputGroup}>
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <View style={[styles.inputGroup, { zIndex: 10 }]}> 
             <Text style={styles.label}>Họ và tên</Text>
-            <TextInput style={styles.input} value={userName} onChangeText={setUserName} placeholderTextColor="#888" />
-
-            {userType == 'user' && ( 
-              <View style={styles.checkboxContainer}>
-                <Checkbox style={styles.checkbox} value={isSaved} onValueChange={setSaved} color={isSaved ? '#3875F6' : undefined} />
-                <Text style={styles.checkboxLabel}>Lưu vào danh sách</Text>
+            <TextInput
+              style={styles.input}
+              value={userName}
+              onChangeText={(text) => {
+                const capitalized = capitalizeAfterSpaces(text);
+                setUserNameStr(capitalized);
+                if (borrowerId) setBorrowerId(null); 
+              }}
+              placeholder="Nhập họ và tên người liên quan"
+              placeholderTextColor="#AAAAAA"
+            />
+            {showSuggestions && filteredContacts.length > 0 && (
+              <View style={styles.suggestionsContainer}>
+                {filteredContacts.map((item) => (
+                    <TouchableOpacity
+                      key={item.id ? item.id.toString() : Math.random().toString()}
+                      style={styles.suggestionItem}
+                      onPress={() => {
+                        setUserNameStr(item.name);
+                        setBorrowerId(item.id); 
+                        setShowSuggestions(false);
+                        setShowPhoneInput(false);
+                        setPhone("");
+                        setIsSaveContact(false);
+                      }}
+                    >
+                      <Text style={styles.suggestionText}>{item.name}</Text>
+                      {item.phone && <Text style={{color: '#888', fontSize: 12}}>{item.phone}</Text>}
+                    </TouchableOpacity>
+                  ))}
               </View>
             )}
-            </View>
+            {showPhoneInput && (
+              <View style={{marginTop: 20}}>
+                <Text style={styles.label}>Số điện thoại</Text>
+                <TextInput
+                  style={styles.input}
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder="Nhập số điện thoại"
+                  placeholderTextColor="#AAAAAA"
+                  keyboardType="phone-pad"
+                />
+                <View style={[styles.checkboxContainer, { marginTop: 10 }]}>
+                  <Checkbox style={styles.checkbox} value={isSaveContact} onValueChange={setIsSaveContact} color={isSaveContact ? '#3875F6' : undefined} />
+                  <Text style={styles.checkboxLabel}>Lưu vào danh sách</Text>
+                </View>
+              </View>
+            )}
+          </View>
 
-          {/* TODO */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Loại</Text>
             {userType !== 'group' && (
@@ -171,7 +544,40 @@ const addTransactionScreen = () => {
             )}
           </View>
 
-          {/* Ngày trả */}
+          {type === 'chi' && (
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Chọn nhóm</Text>
+              <Dropdown
+                style={styles.dropdown}
+                containerStyle={styles.dropdownContainer}
+                itemTextStyle={styles.itemText}
+                selectedTextStyle={styles.selectedText}
+                activeColor={'#1e1e1e'}
+                data={[
+                  { label: 'Tạo nhóm mới', value: 'create_new' },
+                  ...groups.map(group => ({ label: group.name, value: group.id }))
+                ]}
+                labelField="label"
+                valueField="value"
+                value={selectedGroup?.id}
+                onChange={item => {
+                  if (item.value === 'create_new') {
+                    router.push({
+                      pathname: '/screen/create-group',
+                      params: { userId: auth.user?.id ?? '' }
+                    });
+                  } else {
+                    const group = groups.find(g => g.id === item.value);
+                    setSelectedGroup(group);
+                  }
+                }}
+                placeholder="Chọn nhóm"
+                placeholderStyle={{ color: '#AAAAAA' }}
+                renderRightIcon={() => <Ionicons name="chevron-down" size={20} color="#FFFFFF" />}
+              />
+            </View>
+          )}
+
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Ngày trả</Text>
             <TouchableOpacity style={styles.dropdown} onPress={() => setShowDatePicker(true)}>
@@ -183,11 +589,17 @@ const addTransactionScreen = () => {
             )}
           </View>
 
-          {/* Số tiền */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Số tiền</Text>
             <View style={styles.amountInputContainer}>
-              <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} value={amount} onChangeText={setAmount} keyboardType="numeric" />
+              <TextInput 
+                style={[styles.input, { flex: 1, marginBottom: 0 }]} 
+                value={amount} 
+                onChangeText={setAmount} 
+                keyboardType="numeric" 
+                placeholder="0"
+                placeholderTextColor="#AAAAAA"
+              />
               <Text style={styles.currencySymbol}>đ</Text>
             </View>
           </View>
@@ -209,30 +621,34 @@ const addTransactionScreen = () => {
             />
           </View>
 
-          {/* Lặp lại */}
           <View style={[styles.checkboxContainer, { marginTop: 10 }]}>
             <Checkbox style={styles.checkbox} value={isRepeat} onValueChange={setRepeat} color={isRepeat ? '#3875F6' : undefined} />
             <Text style={styles.checkboxLabel}>Lặp lại</Text>
           </View>
 
-          {/* Ghi chú */}
           <View style={[styles.inputGroup, { marginTop: 20 }]}>
             <Text style={styles.label}>Ghi chú</Text>
-            <TextInput style={[styles.input, styles.textArea]} multiline numberOfLines={4} value={note} onChangeText={setNote} placeholder="..." placeholderTextColor="#888" />
+            <TextInput style={[styles.input, styles.textArea]} multiline numberOfLines={4} value={note} onChangeText={setNote} placeholder="..." placeholderTextColor="#AAAAAA" />
           </View>
         </ScrollView>
 
         <View style={styles.footer}>
-          <TouchableOpacity style={styles.submitBtn} onPress={onSubmit}>
-            <Text style={styles.submitBtnText}>Tạo mới</Text>
+          <TouchableOpacity 
+            style={[styles.submitBtn, isSubmitting && styles.submitBtnDisabled]} 
+            onPress={onSubmit}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.submitBtnText}>Tạo mới</Text>
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   )
 }
-
-export default addTransactionScreen
 
 const styles = StyleSheet.create({
   container: { 
@@ -260,7 +676,8 @@ const styles = StyleSheet.create({
     width: 50 
   },
   scrollContent: { 
-    padding: 20 
+    padding: 20,
+    paddingBottom: 50
   },
   inputGroup: { 
     marginBottom: 20 
@@ -278,8 +695,8 @@ const styles = StyleSheet.create({
     color: '#fff',
     padding: 12,
     fontSize: 16,
+    backgroundColor: '#3A3A3A'
   },
-  
   dropdown: {
     height: 50,
     borderColor: '#555',
@@ -288,9 +705,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    backgroundColor: '#3A3A3A'
   },
-  
   dropdownContainer: {
     backgroundColor: '#1A1A1A',
     borderRadius: 15,
@@ -307,8 +724,26 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 16,
   },
-  dropdownItem: {
-    paddingVertical: 10,
+  suggestionsContainer: {
+    position: 'absolute',
+    top: 85, // Adjust based on input height + label
+    left: 0,
+    right: 0,
+    backgroundColor: '#3A3A3A',
+    borderRadius: 5,
+    maxHeight: 150,
+    zIndex: 9999, // High zIndex to float over other inputs
+    borderWidth: 1,
+    borderColor: '#555'
+  },
+  suggestionItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#444',
+  },
+  suggestionText: {
+    color: '#FFF',
+    fontSize: 16,
   },
   amountInputContainer: { 
     flexDirection: 'row', 
@@ -355,7 +790,13 @@ const styles = StyleSheet.create({
     fontSize: 18, 
     fontWeight: 'bold' 
   },
-  disabledInput: {
-    borderColor: '#666',
+  submitBtnDisabled: {
+    opacity: 0.6,
   },
-})
+  disabledInput: {
+    backgroundColor: '#333',
+    opacity: 0.6,
+  },
+});
+
+export default AddTransactionScreen;

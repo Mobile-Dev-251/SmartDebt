@@ -7,6 +7,9 @@
     "icon": "./assets/images/icon.png",
     "scheme": "smartdebt",
     "userInterfaceStyle": "automatic",
+    "notification": {
+      "iosDisplayInForeground": true
+    },
     "ios": {
       "supportsTablet": true,
       "infoPlist": {

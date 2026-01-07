@@ -1,5 +1,5 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState, useEffect } from 'react';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import React, { useDebugValue, useEffect, useState, useCallback } from 'react';
 import {
   Dimensions,
   Image,
@@ -8,7 +8,8 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
+  ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -16,9 +17,10 @@ import AntDesign from '@expo/vector-icons/AntDesign';
 import Entypo from '@expo/vector-icons/Entypo';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useDispatch, useSelector } from 'react-redux';
-import { Transaction } from 'firebase/firestore';
 import { UserProfile, setCurrentRoute } from '@/store/progress';
 import { RootState } from '@/store/store';
+import { getAllDebts } from '@/service/debtsService';
+import { storage } from '@/utils/storage';
 
 const { width } = Dimensions.get('window');
 
@@ -31,68 +33,160 @@ const TransUserScreen = () => {
   const [showMenu, setShowMenu] = useState(false);
   const [showGroupOption, setShowGroupOption] = useState(false);
   const [transaction_list, setTransaction_list] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const { prevRoute } = useSelector((state: RootState) => state.progress)
 
-  useEffect(() => {
-    // TODO: Replace with actual API call to fetch transactions
-    setTransaction_list([]);
-  }, [item.id]);
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+        const targetId = Array.isArray(item.id) ? item.id[0] : item.id;
+        const targetName = Array.isArray(item.name) ? item.name[0] : item.name;
+        
+        // 1. Get current user
+        let currentUserId: number | null = null;
+        const storedUser = await storage.getUser();
+        if (storedUser && storedUser.id) {
+          currentUserId = storedUser.id;
+        }
 
-  const details_choices = [
-    { label: 'Hủy lưu', value: 'unsaved' }
-  ];
+        // 2. Get all debts
+        const debtsRes: any = await getAllDebts();
+        const debts: any[] = Array.isArray(debtsRes) ? debtsRes : debtsRes?.data || [];
 
-  useEffect(() => {
-    const id = Array.isArray(item.id) ? item.id[0] : (item.id || null);
-    const userName = Array.isArray(item.name) ? item.name[0] : (item.name || "Không tên");
-    const userType = Array.isArray(item.type) ? item.type[0] : (item.type || "");
+        // 3. Filter debts involving targetId
+        // Assuming targetId corresponds to lender_id or borrower_id in debts
+        // Note: item.id might be string, debt IDs are numbers usually. 
+        // We need to match loosely.
 
-    const userData: UserProfile = {
-      id: id,
-      userName: userName,
-      type: userType
+        const filteredDebts = debts.filter((debt: any) => {
+            // Check if current user is involved (should be true for all debts returned by getAllDebts usually)
+            // And check if targetId user is the OTHER party
+            
+            if (currentUserId == null) return true; // Can't filter if we don't know who "me" is
+
+            const isMeLender = debt.lender_id === currentUserId;
+            const isMeBorrower = debt.borrower_id === currentUserId;
+
+            if (isMeLender) {
+                // I lent money. The borrower should be targetId
+                return String(debt.borrower_id) === String(targetId);
+            } else if (isMeBorrower) {
+                // I borrowed money. The lender should be targetId
+                return String(debt.lender_id) === String(targetId);
+            }
+            return false;
+        });
+
+        // 4. Group by date
+        const groupedData: { [key: string]: any[] } = {};
+
+        filteredDebts.forEach((debt: any) => {
+            const dateObj = new Date(debt.created_at || debt.due_date);
+            const dateKey = dateObj.toLocaleDateString('vi-VN');
+            
+            let isDebt = false; // "Nợ" (mình nợ họ) or "Cho vay" (họ nợ mình)
+            // Visual logic: 
+            // - Blue: Cho mượn (Lend) -> Mình là Lender -> debt.lender_id == currentUserId
+            // - Red: Mượn nợ (Borrow) -> Mình là Borrower -> debt.borrower_id == currentUserId
+            
+            if (currentUserId != null && debt.borrower_id === currentUserId) {
+                isDebt = true; // Mình nợ -> Red
+            }
+
+            if (!groupedData[dateKey]) {
+                groupedData[dateKey] = [];
+            }
+            
+            groupedData[dateKey].push({
+                id: String(debt.id),
+                title: debt.title || debt.note || "Giao dịch",
+                amount: `${Number(debt.amount).toLocaleString('vi-VN')}đ`,
+                type: isDebt ? "Mượn nợ" : "Cho mượn",
+                isDebt: isDebt,
+                date: dateObj
+            });
+        });
+
+        // Sort keys and data
+        const sortedKeys = Object.keys(groupedData).sort((a, b) => {
+            const partsA = a.split('/');
+            const partsB = b.split('/');
+            const dateA = new Date(Number(partsA[2]), Number(partsA[1]) - 1, Number(partsA[0]));
+            const dateB = new Date(Number(partsB[2]), Number(partsB[1]) - 1, Number(partsB[0]));
+            return dateB.getTime() - dateA.getTime();
+        });
+
+        const sections = sortedKeys.map(key => ({
+            title: key,
+            data: groupedData[key].sort((a,b) => b.date.getTime() - a.date.getTime())
+        }));
+
+        setTransaction_list(sections);
+
+    } catch (e) {
+        console.error("Error fetching transactions for user:", e);
+    } finally {
+        setIsLoading(false);
     }
-    dispatch(setCurrentRoute({pageId: PAGE_ID, user: userData }));
-  }, [item.name, dispatch]);
-  const renderItem = ({ item: transaction }: any) => (
-    <View style={styles.transactionCard}>
-      <Image 
-        source={{ uri: 'https://avatar.iran.liara.run/public/boy' }} 
-        style={styles.cardAvatar} 
-      />
-      <View style={styles.cardInfo}>
-        <Text style={styles.cardName}>{item.name || "Không tên"}</Text>
-        <Text style={styles.cardSubTitle}>{transaction.title}</Text>
-      </View>
-      <View style={styles.cardAmountContainer}>
-        <Text style={styles.cardType}>{transaction.type}</Text>
-        <Text style={[styles.cardAmount, { color: transaction.isDebt ? '#FF5050' : '#50ADFF' }]}>
-          {transaction.amount}
-        </Text>
-      </View>
-    </View>
+  };
+
+  useFocusEffect(
+      useCallback(() => {
+          if (item.id) {
+            fetchData();
+          }
+      }, [item.id])
   );
+
+  useEffect(() => {
+    // Không lưu currentRoute cho screen này
+  }, [item.name, dispatch]);
+
+  const renderItem = ({ item: transaction }: any) => {
+    const moneyColor = transaction.isDebt ? '#FF424F' : '#4285F4';
+
+    return (
+      <TouchableOpacity 
+        style={styles.transactionCard}
+        onPress={() => {
+          router.push({
+            pathname: '/transaction-detail',
+            params: { id: transaction.id }
+          });
+        }}
+      >
+        <View style={styles.cardAvatarContainer}>
+          <Image 
+            source={require('../../assets/images/avatar.png')} 
+            style={styles.cardAvatar} 
+          />
+        </View>
+        <View style={styles.cardInfo}>
+          <Text style={styles.cardName}>{item.name || "Không tên"}</Text>
+          <Text style={styles.cardSubTitle} numberOfLines={1}>{transaction.title}</Text>
+        </View>
+        <View style={styles.cardAmountContainer}>
+          <Text style={styles.cardType}>{transaction.type}</Text>
+          <Text style={[styles.cardAmount, { color: moneyColor }]}>
+            {transaction.amount}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.headerContainer}>
         <TouchableOpacity style={styles.backButton} onPress={() => {
-          if (router.canGoBack()) {
-            router.back();
-            return;
-          }
-
           // Nếu khôi phục tiến trình, xác định Tab dựa trên prevRoute hoặc item.type
           let targetTab = 'recent'; 
           if (prevRoute === 'saved' || item.type === 'user') targetTab = 'saved';
           if (prevRoute === 'group' || item.type === 'group') targetTab = 'group';
 
           // Điều hướng về trang transaction kèm tham số 'tab'
-          router.push({
-            pathname: '/(tabs)/transaction',
-            params: { tab: targetTab }
-          } as any);
+          router.push(`/(tabs)/transaction?tab=${targetTab}`);
         }}>
           <Ionicons name="chevron-back-outline" size={30} color="#FFFFFF"/>
         </TouchableOpacity>
@@ -175,6 +269,10 @@ const TransUserScreen = () => {
             </TouchableOpacity>
 
             <Text style={styles.recentTitle}>Giao dịch gần đây</Text>
+             {isLoading && <ActivityIndicator size="small" color="#fff" style={{marginTop: 10}} />}
+             {!isLoading && transaction_list.length === 0 && (
+                 <Text style={{color: '#888', marginTop: 10}}>Chưa có giao dịch nào với người này</Text>
+             )}
           </View>
         }
         contentContainerStyle={styles.listContent}
@@ -314,6 +412,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
+  cardAvatarContainer: {
+    marginRight: 12,
+  },
   cardAvatar: {
     width: 45,
     height: 45,
@@ -344,6 +445,40 @@ const styles = StyleSheet.create({
   cardAmount: {
     fontWeight: 'bold',
     fontSize: 14,
+  },
+  transactionItem: {
+    backgroundColor: '#3A3A3A',
+    marginHorizontal: 20,
+    marginVertical: 5,
+    padding: 15,
+    borderRadius: 12,
+  },
+  transactionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  transactionInfo: {
+    flex: 1,
+  },
+  transactionTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  transactionType: {
+    color: '#AAAAAA',
+    fontSize: 14,
+  },
+  transactionAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  debtColor: {
+    color: '#FF5252',
+  },
+  lendColor: {
+    color: '#4285F4',
   },
    
   dropdown: {
