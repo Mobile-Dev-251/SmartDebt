@@ -54,6 +54,7 @@ const HomeScreen = () => {
   const [totalBorrow, setTotalBorrow] = useState<number>(0);
   const [loadingSummary, setLoadingSummary] = useState<boolean>(true);
   const { unreadCount, readNotificationIds } = useSelector((state: RootState) => state.notifications);
+  const { user: authUser } = useSelector((state: RootState) => state.auth);
 
   const loadData = useCallback(async () => {
     if (totalMonth === 0 && totalLend === 0 && totalBorrow === 0) {
@@ -144,10 +145,8 @@ const HomeScreen = () => {
 
             const debtDate = new Date(debt.created_at || debt.due_date);
             if (debtDate.getMonth() === currentMonth && debtDate.getFullYear() === currentYear) {
-              // Logic tính tổng chi tiêu tháng:
-              // Nếu mình cho vay (lend) -> tiền đi ra -> tính vào chi tiêu (+)
-              // Nếu mình vay (borrow) -> tiền đi vào -> (tùy logic, ở đây tạm trừ hoặc không tính)
-              if (transactionType === 'lend') monthTotal += amount;
+              // Logic tính tổng chi tiêu tháng: tổng cho mượn - tổng mượn (có thể âm)
+              monthTotal += (transactionType === 'lend' ? amount : -amount);
             }
           }
         });
@@ -257,8 +256,10 @@ const HomeScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
-      loadData();
-    }, [loadData])
+      if (authUser) {
+        loadData();
+      }
+    }, [authUser, loadData])
   );
 
   return (

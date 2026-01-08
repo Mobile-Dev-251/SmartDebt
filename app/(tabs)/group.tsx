@@ -6,7 +6,7 @@ import React, { useContext, useEffect, useState, useCallback } from 'react';
 import { ActivityIndicator, Dimensions, Image, SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { SearchContext } from './transaction';
+import { SearchContext } from '../contexts/searchContext';
 
 import { useSelector } from 'react-redux';
 import { RootState } from '@/store/store';
@@ -25,7 +25,7 @@ interface SectionData {
 }
 
 const GroupScreen = () => {
-  const searchText = useContext(SearchContext);
+  const { searchText } = useContext(SearchContext);
   const [fullData, setFullData] = useState<SectionData[]>([]);
   const [displayData, setDisplayData] = useState<SectionData[]>([]);
 
@@ -70,8 +70,10 @@ const GroupScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
-      fetchData();
-    }, [])
+      if (userId) {
+        fetchData();
+      }
+    }, [userId])
   );
 
   useEffect(() => {

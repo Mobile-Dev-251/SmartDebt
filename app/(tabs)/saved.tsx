@@ -13,9 +13,11 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { SearchContext } from './transaction'; // Đảm bảo đường dẫn import đúng
+import { SearchContext } from '../contexts/searchContext'; // Đảm bảo đường dẫn import đúng
 import { getAllContacts } from '@/service/contactsService';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
+import { RootState } from '@/store/store';
 // Đã xóa các import không cần thiết: debtsService, groupsService
 
 interface InfoItem {
@@ -29,10 +31,11 @@ interface SectionData {
 }
 
 const SavedScreen = () => {
-  const searchText = useContext(SearchContext);
+  const { searchText } = useContext(SearchContext);
   const [fullData, setFullData] = useState<SectionData[]>([]);
   const [displayData, setDisplayData] = useState<SectionData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { user: authUser } = useSelector((state: RootState) => state.auth);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -88,8 +91,10 @@ const SavedScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
-      fetchData();
-    }, [])
+      if (authUser) {
+        fetchData();
+      }
+    }, [authUser])
   );
 
   useEffect(() => {

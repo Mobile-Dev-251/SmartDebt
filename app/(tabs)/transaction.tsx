@@ -1,6 +1,6 @@
 import { colors, radius, spacingX, spacingY } from '@/constants/theme';
 import { scale } from '@/utils/stylings';
-import React, {useState, createContext, useEffect} from 'react';
+import React, {useState, useContext} from 'react';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { Dimensions, StyleSheet, TextInput, TouchableOpacity, View, Text } from 'react-native';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
@@ -18,15 +18,16 @@ import { getMyNotifications } from '@/service/userService';
 import { setNotifications } from '@/store/notifications';
 import { useCallback } from 'react';
 
-export const SearchContext = createContext('');   
+import { SearchProvider, SearchContext } from '../contexts/searchContext';   
 const navbar = createMaterialTopTabNavigator();
 
 export default function TransactionScreen() {
   const dispatch = useDispatch();
   const router = useRouter();
   const { tab } = useLocalSearchParams();
-  const [searchText, setSearchText] = useState('');
+  const { searchText, setSearchText } = useContext(SearchContext);
   const { unreadCount, readNotificationIds } = useSelector((state: RootState) => state.notifications);
+  const { user: authUser } = useSelector((state: RootState) => state.auth);
   const initialTab = tab === 'saved' ? "Đã lưu" : 
                      tab === 'group' ? "Nhóm" : 
                      "Gần đây";
@@ -44,12 +45,14 @@ export default function TransactionScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchNotificationCount();
-    }, [fetchNotificationCount])
+      if (authUser) {
+        fetchNotificationCount();
+      }
+    }, [authUser, fetchNotificationCount])
   );
 
   return (
-      <SearchContext.Provider value={searchText}>
+      <SearchProvider>
           <View style={{flex: 1, backgroundColor: '#2F2E2E'}}>
             <View style = {styles.searchContainer}>
               <View style = {styles.inputContainer}>
@@ -106,7 +109,7 @@ export default function TransactionScreen() {
                 <navbar.Screen name="Nhóm" component={GroupScreen} />
             </navbar.Navigator>
           </View>
-      </SearchContext.Provider>
+      </SearchProvider>
   )
 };
 

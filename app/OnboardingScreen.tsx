@@ -13,15 +13,17 @@ import {
 import { useRouter } from 'expo-router';
 import { scale, verticalScale } from '@/utils/stylings';
 import { colors, spacingX, spacingY, radius } from '@/constants/theme';
+import { storage } from '@/utils/storage';
 
 const { height, width } = Dimensions.get('window');
 
 const SmartDebtIntroScreen = () => {
   const router = useRouter();
 
-  const handleStart = () => {
-    // Điều hướng đến màn hình chính
-    // Thay đổi route phù hợp: '/(tabs)', '/home', '/auth/login', etc.
+  const handleStart = async () => {
+    // Đánh dấu đã xem onboarding
+    await storage.setOnboardingCompleted();
+    // Điều hướng đến màn hình auth
     router.push('/auth/AuthScreen' as any);
   };
 

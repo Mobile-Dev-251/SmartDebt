@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const TOKEN_KEY = "@smartdebt:token";
 const USER_KEY = "@smartdebt:user";
+const ONBOARDING_KEY = "@smartdebt:onboarding_completed";
 
 export const storage = {
   // Token management
@@ -57,20 +58,31 @@ export const storage = {
     }
   },
 
+  // Onboarding management
+  async getOnboardingCompleted(): Promise<boolean> {
+    try {
+      const completed = await AsyncStorage.getItem(ONBOARDING_KEY);
+      return completed === 'true';
+    } catch (error) {
+      console.error("Error getting onboarding:", error);
+      return false;
+    }
+  },
+
+  async setOnboardingCompleted(): Promise<void> {
+    try {
+      await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+    } catch (error) {
+      console.error("Error setting onboarding:", error);
+    }
+  },
+
   // Clear all data
   async clearAll(): Promise<void> {
     try {
-      await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
+      await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY, ONBOARDING_KEY]);
     } catch (error) {
       console.error("Error clearing storage:", error);
     }
   },
 };
-
-
-
-
-
-
-
-

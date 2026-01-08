@@ -1,16 +1,29 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 
 import Entypo from '@expo/vector-icons/Entypo';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { setCurrentRoute } from '@/store/progress';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { RootState } from '@/store/store';
 
 const TabsLayout = () => {
   const dispatch = useDispatch();
+  const router = useRouter();
+  const { user, isLoading } = useSelector((state: RootState) => state.auth);
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.replace('/OnboardingScreen');
+    }
+  }, [user, isLoading, router]);
+
+  if (!user) {
+    return null; // Hoặc loading component
+  }
   // const initialTab = tab === 'saved' ? "Đã lưu" : 
   //                   tab === 'group' ? "Nhóm" : 
   //                   "Gần đây";

@@ -4,10 +4,11 @@ import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context'
 import { getAllDebts } from "@/service/debtsService";
 import { getMyGroups, getGroupMembers } from '@/service/groupsService';
 import { getAllContacts } from '@/service/contactsService';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { storage } from "../../utils/storage";
 import { formatDateVN } from "@/utils/dateUtils";
+import { RootState } from "@/store/store";
 
 interface TransactionItem {
   id: string;
@@ -27,6 +28,7 @@ const RecentScreen = () => {
   const [listByDay, setListByDay] = useState<SectionData[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const dispatch = useDispatch()
+  const { user: authUser } = useSelector((state: RootState) => state.auth)
   const router = useRouter()
 
   const fetchData = async () => {
@@ -103,8 +105,10 @@ const RecentScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
-      fetchData();
-    }, [])
+      if (authUser) {
+        fetchData();
+      }
+    }, [authUser])
   );
 
   const renderTransactionItem = ({ item }: { item: TransactionItem }) => {
@@ -239,3 +243,4 @@ const styles = StyleSheet.create({
     fontSize: 15 
   },
 })
+ 

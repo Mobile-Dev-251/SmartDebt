@@ -21,8 +21,10 @@ import {
 import { getMyProfile } from "@/service/userService";
 import { storage } from "@/utils/storage";
 import { useFocusEffect } from "@react-navigation/native";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { logOut } from "@/store/auth";
+import { clearSession } from "@/store/progress";
+import { RootState } from "@/store/store";
 
 type MenuItem = {
   id: string;
@@ -35,6 +37,7 @@ type MenuItem = {
 const ProfileScreen = () => {
   const router = useRouter();
   const dispatch = useDispatch();
+  const { user: authUser } = useSelector((state: RootState) => state.auth);
   const [userName, setUserName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -125,8 +128,10 @@ const ProfileScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
-      loadProfile();
-    }, [loadProfile])
+      if (authUser) {
+        loadProfile();
+      }
+    }, [authUser, loadProfile])
   );
 
   const menu: MenuItem[] = [
@@ -165,6 +170,7 @@ const ProfileScreen = () => {
       onPress: async () => 
       {
         dispatch(logOut());
+        dispatch(clearSession());
         await storage.removeToken();
         await storage.removeUser();
         router.push('/auth/AuthScreen');

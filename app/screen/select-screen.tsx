@@ -18,7 +18,7 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SearchContext } from '../(tabs)/transaction';
+import { SearchContext } from '../contexts/searchContext';
 import { useDispatch } from 'react-redux';
 import { getAllContacts } from '@/service/contactsService';
 
@@ -106,7 +106,7 @@ const SelectScreen = () => {
           <View style={styles.infoButton} />
         </View>
 
-        <SearchContext.Provider value={searchText}>
+        <SearchContext.Provider value={{ searchText, setSearchText }}>
             <View style={{flex: 1, backgroundColor: '#2F2E2E'}}>
               <View style = {styles.searchContainer}>
                 <View style = {styles.inputContainer}>

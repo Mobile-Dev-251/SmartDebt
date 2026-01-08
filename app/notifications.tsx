@@ -56,6 +56,7 @@ const NotificationsScreen = () => {
   const dispatch = useDispatch();
   // Lấy danh sách ID đã đọc từ Redux (nếu cần dùng để filter thêm)
   const { readNotificationIds } = useSelector((state: RootState) => state.notifications);
+  const { user: authUser } = useSelector((state: RootState) => state.auth);
   
   const [pushToken, setPushToken] = useState<string | null>(null);
   const [permissionStatus, setPermissionStatus] = useState<string>("Đang kiểm tra...");
@@ -65,31 +66,42 @@ const NotificationsScreen = () => {
   const [hideRead, setHideRead] = useState(false);
 
   useEffect(() => {
-    fetchNotifications();
-    checkPermissions();
-    registerForPushNotificationsAsync().then(async (token) => {
-      if (token) {
-        setPushToken(token);
-        // Gửi token lên server
-        try {
-          await updatePushToken(token);
-          console.log("Push token updated successfully");
-        } catch (error) {
-          console.error("Failed to update push token:", error);
+    if (authUser) {
+      fetchNotifications();
+      checkPermissions();
+      registerForPushNotificationsAsync().then(async (token) => {
+        if (token) {
+          setPushToken(token);
+          // Gửi token lên server
+          try {
+            await updatePushToken(token);
+            console.log("Push token updated successfully");
+          } catch (error: any) {
+            // Check if it's a unique constraint violation (duplicate push token)
+            if (error?.code === '23505' || error?.error?.code === '23505') {
+              console.warn("Push token already exists for this user or another user:", token);
+            } else {
+              console.error("Failed to update push token:", error);
+            }
+          }
         }
-      }
-    });
+      });
+    }
 
     const notificationListener = Notifications.addNotificationReceivedListener(
       (notification) => {
         setNotificationReceived(notification);
-        fetchNotifications();
+        if (authUser) {
+          fetchNotifications();
+        }
       }
     );
 
     const responseListener = Notifications.addNotificationResponseReceivedListener(
       (response) => {
         const data = response.notification.request.content.data;
+        console.log("Push notification data:", data);
+        let params: any = {};
         if (data?.debtId) {
              router.push({
                 pathname: "/transaction-detail",
@@ -124,6 +136,7 @@ const NotificationsScreen = () => {
                   createdAt: new Date(item.created_at),
                   payload: {
                       id: item.debt_id?.toString(),
+                      typeValue: item.type || 'lend', // Thêm typeValue nếu có, mặc định 'lend'
                   }
               }));
               // Sắp xếp: chưa đọc trước, đã đọc sau; trong mỗi nhóm sắp xếp theo thời gian mới nhất
@@ -169,11 +182,24 @@ const NotificationsScreen = () => {
     }
 
     // 2. Điều hướng
+    let params: any = {};
     if (item.payload.id) {
-         router.push({
-            pathname: "/transaction-detail",
-            params: item.payload as any,
-         });
+      params.id = item.payload.id;
+    }
+    if (item.payload.typeValue === 'group') {
+      params.expenseId = item.payload.id;
+      params.typeValue = 'group';
+    } else if (item.payload.typeValue) {
+      params.typeValue = item.payload.typeValue;
+    }
+    if (Object.keys(params).length > 0) {
+      router.push({
+        pathname: "/transaction-detail",
+        params,
+      });
+    } else {
+      // Nếu không có debt_id, có thể hiển thị alert hoặc không làm gì
+      Alert.alert("Thông báo", "Không thể mở chi tiết giao dịch cho thông báo này.");
     }
   };
 

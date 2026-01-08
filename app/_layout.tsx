@@ -9,21 +9,29 @@ import { Platform, View } from "react-native";
 import { Provider, useDispatch } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { persistor, store } from '../store/store';
+import { useSelector } from 'react-redux';
+import { RootState } from '../store/store';
 import { validateCurrentRoute } from '../store/progress';
 import { useRouter } from 'expo-router';
 
 // Component để handle navigation sau khi fonts loaded
 function NavigationHandler() {
   const router = useRouter();
+  const { user, isLoading } = useSelector((state: RootState) => state.auth);
   
   useEffect(() => {
-    // Force navigate to home after fonts loaded
-    const timer = setTimeout(() => {
-      router.replace('/(tabs)/home');
-    }, 100);
-    
-    return () => clearTimeout(timer);
-  }, [router]);
+    if (!isLoading) {
+      const timer = setTimeout(() => {
+        if (user) {
+          router.replace('/(tabs)/home');
+        } else {
+          router.replace('/OnboardingScreen');
+        }
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [router, user, isLoading]);
   
   return null;
 }

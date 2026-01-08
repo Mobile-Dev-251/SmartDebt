@@ -14,7 +14,9 @@ import { scale } from "@/utils/stylings";
 import { getAllDebts } from "@/service/debtsService";
 import { getAllContacts } from "@/service/contactsService";
 import { storage } from "@/utils/storage";
-import { getMyGroups, getGroupMembers } from "@/service/groupsService"; 
+import { getMyGroups, getGroupMembers } from "@/service/groupsService";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store/store"; 
 
 type TabType = "borrow" | "lend";
 
@@ -39,6 +41,7 @@ const StatisticScreen = () => {
   const [borrowersData, setBorrowersData] = useState<PersonDebt[]>([]);
   const [lendersData, setLendersData] = useState<PersonDebt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { user: authUser } = useSelector((state: RootState) => state.auth);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -129,17 +132,17 @@ const StatisticScreen = () => {
       }));
 
       // Convert monthly stats to array
-      // Generate last 6 months keys to ensure order? Or just take what's available
-      const months = Object.keys(monthlyStats).sort((a,b) => {
-         // Sort by month number "Tháng X"
-         const numA = parseInt(a.replace('Tháng ', ''));
-         const numB = parseInt(b.replace('Tháng ', ''));
-         return numA - numB;
-      });
+      // Generate last 6 months to ensure all months are shown
+      const now = new Date();
+      const months: string[] = [];
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        months.push(`Tháng ${date.getMonth() + 1}`);
+      }
 
       const chartData: MonthlyData[] = months.map(m => ({
           month: m,
-          value: monthlyStats[m],
+          value: monthlyStats[m] || 0, // Use 0 if no data for that month
           color: activeTab === "borrow" ? "#FF6B6B" : "#4285F4"
       }));
 
@@ -156,8 +159,10 @@ const StatisticScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
-      fetchData();
-    }, [activeTab]) // Re-fetch or re-calculate when tab changes
+      if (authUser) {
+        fetchData();
+      }
+    }, [activeTab, authUser]) // Re-fetch or re-calculate when tab changes
   );
 
   // Tính tổng số tiền

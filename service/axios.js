@@ -14,8 +14,9 @@ const getHostIP = () => {
 const IP = getHostIP();
 
 // Use environment variable or fallback to local IP
-// Nếu có EXPO_PUBLIC_API_URL thì dùng, không thì dùng production URL
+// Nếu có EXPO_PUBLIC_API_URL thì dùng, không thì dùng local
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://app-nodejs-smartdebt-backend-f5a5f6d5fteddea8.eastasia-01.azurewebsites.net';
+
 
 // Log BASE_URL for debugging
 console.log("API Base URL:", BASE_URL);
