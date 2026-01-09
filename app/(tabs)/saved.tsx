@@ -152,43 +152,51 @@ const SavedScreen = () => {
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={{flex: 1}}>  
-        <View style= {{flex: 1, backgroundColor: '#2F2E2E'}}>
-          {
-            isLoading? (
-              <ActivityIndicator size="large" color="#3275F1" style={{marginTop: 20}} />
-            ) : (
-              <SectionList 
-                stickySectionHeadersEnabled = {false}
-                showsVerticalScrollIndicator = {false}
-                sections={displayData}
-                keyExtractor={(item, index) => item.id + index}
-                renderItem={renderInfoItem}
-                renderSectionHeader={({ section: { title } }) => (
-                  <Text style={styles.sectionHeader}>{title}</Text>
-                )}
-                ListEmptyComponent={() => (
-                    <Text style={{color: 'white', textAlign: 'center', marginTop: 20}}>
-                        Chưa có liên hệ nào được lưu
-                    </Text>
-                )}
-              />
-            )
-          }
-          <TouchableOpacity style={styles.addNew} onPress={() => {
-            router.push({
-              pathname: '/screen/select-screen',
-              params: {
-                type: 'user'
-              }
-            })
-          }}>
+      <SafeAreaView style={{ flex: 1 }}>
+        <View style={{ flex: 1, backgroundColor: "#2F2E2E" }}>
+          {isLoading ? (
+            <ActivityIndicator
+              size="large"
+              color="#3275F1"
+              style={{ marginTop: 20 }}
+            />
+          ) : (
+            <SectionList
+              stickySectionHeadersEnabled={false}
+              showsVerticalScrollIndicator={false}
+              sections={displayData}
+              keyExtractor={(item, index) => item.id + index}
+              renderItem={renderInfoItem}
+              renderSectionHeader={({ section: { title } }) => (
+                <Text style={styles.sectionHeader}>{title}</Text>
+              )}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              ListEmptyComponent={() => (
+                <Text
+                  style={{ color: "white", textAlign: "center", marginTop: 20 }}
+                >
+                  Chưa có liên hệ nào được lưu
+                </Text>
+              )}
+            />
+          )}
+          <TouchableOpacity
+            style={styles.addNew}
+            onPress={() => {
+              router.push({
+                pathname: "/screen/select-screen",
+                params: {
+                  type: "user",
+                },
+              });
+            }}
+          >
             <AntDesign name="plus" size={35} color="white" />
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     </SafeAreaProvider>
-  )
+  );
 }
 
 export default SavedScreen

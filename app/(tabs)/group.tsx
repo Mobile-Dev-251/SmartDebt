@@ -130,43 +130,52 @@ const GroupScreen = () => {
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={{flex: 1}}>  
-        <View style= {{flex: 1, backgroundColor: '#2F2E2E'}}>
-          {
-            isLoading? (
-              <ActivityIndicator style={{marginTop: 20}} color="#FFF"></ActivityIndicator>
-            ) : (
-              <SectionList 
-                stickySectionHeadersEnabled= {false}
-                showsVerticalScrollIndicator = {false}
-                sections={displayData}
-                keyExtractor={(item, index) => item.id + index}
-                renderItem={renderInfoItem}
-                renderSectionHeader={({ section: { title } }) => (
-                  <Text style={styles.sectionHeader}>{title}</Text>
-                )}
-                ListEmptyComponent={() => (
-                    <Text style={{color: 'white', textAlign: 'center', marginTop: 20}}>
-                        {fullData.length === 0 ? "Bạn chưa tham gia nhóm nào." : "Không tìm thấy kết quả"}
-                    </Text>
-                )}
-              />
-            )
-          }
-          <TouchableOpacity style={styles.addNew} onPress={ () => {
-            router.push({
-                pathname: '/screen/create-group',
+      <SafeAreaView style={{ flex: 1 }}>
+        <View style={{ flex: 1, backgroundColor: "#2F2E2E" }}>
+          {isLoading ? (
+            <ActivityIndicator
+              style={{ marginTop: 20 }}
+              color="#FFF"
+            ></ActivityIndicator>
+          ) : (
+            <SectionList
+              stickySectionHeadersEnabled={false}
+              showsVerticalScrollIndicator={false}
+              sections={displayData}
+              keyExtractor={(item, index) => item.id + index}
+              renderItem={renderInfoItem}
+              renderSectionHeader={({ section: { title } }) => (
+                <Text style={styles.sectionHeader}>{title}</Text>
+              )}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              ListEmptyComponent={() => (
+                <Text
+                  style={{ color: "white", textAlign: "center", marginTop: 20 }}
+                >
+                  {fullData.length === 0
+                    ? "Bạn chưa tham gia nhóm nào."
+                    : "Không tìm thấy kết quả"}
+                </Text>
+              )}
+            />
+          )}
+          <TouchableOpacity
+            style={styles.addNew}
+            onPress={() => {
+              router.push({
+                pathname: "/screen/create-group",
                 params: {
-                  userId: userId ?? ''
-                }
+                  userId: userId ?? "",
+                },
               });
-          }}>
+            }}
+          >
             <AntDesign name="plus" size={35} color="white" />
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     </SafeAreaProvider>
-  )
+  );
 }
 
 export default GroupScreen
