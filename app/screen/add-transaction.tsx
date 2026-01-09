@@ -57,7 +57,9 @@ const AddTransactionScreen = () => {
 
   const [phone, setPhone] = useState(saved.phone || "");
   const [isSaveContact, setIsSaveContact] = useState(saved.isSaveContact ?? false);
-  const [showPhoneInput, setShowPhoneInput] = useState(false);
+  const [showNameInput, setShowNameInput] = useState(false);
+  const [isSaveContactDisabled, setIsSaveContactDisabled] = useState(false);
+  const [selectedFromContacts, setSelectedFromContacts] = useState(false);
 
   // Helper function to capitalize
   const capitalizeAfterSpaces = (text: string) => {
@@ -207,19 +209,34 @@ const AddTransactionScreen = () => {
   }, [params.type, params.userId]);
 
   useEffect(() => {
-    if (userName && typeof userName === 'string' && userName.trim()) {
+    if (phone && typeof phone === 'string' && phone.trim()) {
       const filtered = contacts.filter(contact =>
-        contact.name && contact.name.trim() && contact.name.toLowerCase().includes(userName.toLowerCase())
+        contact.phone && contact.phone.trim() && contact.phone.includes(phone.trim())
       );
       setFilteredContacts(filtered);
       setShowSuggestions(filtered.length > 0 && !borrowerId);
-      setShowPhoneInput(filtered.length === 0 && userName.trim() !== "");
+      setShowNameInput(filtered.length === 0 && phone.trim() !== "");
     } else {
       setFilteredContacts([]);
       setShowSuggestions(false);
-      setShowPhoneInput(false);
+      setShowNameInput(false);
+      setIsSaveContactDisabled(false);
     }
-  }, [userName, contacts, borrowerId]); 
+  }, [phone, contacts, borrowerId]); 
+
+  useEffect(() => {
+    if (showNameInput && userName && typeof userName === 'string' && userName.trim()) {
+      const exactMatch = contacts.find(c => c.name.toLowerCase() === userName.trim().toLowerCase());
+      if (exactMatch) {
+        setIsSaveContact(true);
+        setIsSaveContactDisabled(true);
+      } else {
+        setIsSaveContactDisabled(false);
+      }
+    } else {
+      setIsSaveContactDisabled(false);
+    }
+  }, [userName, showNameInput, contacts]); 
 
   const typeData = [
     { label: 'Mượn nợ', value: 'muon' }, // Người kia nợ mình
@@ -410,7 +427,7 @@ const AddTransactionScreen = () => {
       const response = await createDebt(debtData);
       if (response && response.debt_id) {
         // Lưu contact nếu được yêu cầu (chỉ lưu nếu Target là người mới)
-        if (isSaveContact && phone && phone.trim() && targetUserId !== currentUserId) {
+        if (isSaveContact && phone && phone.trim() && targetUserId !== currentUserId && !selectedFromContacts) {
           try {
             await createContactByPhone({ phone: phone.trim(), name: userName.trim() });
           } catch (e) {
@@ -469,17 +486,22 @@ const AddTransactionScreen = () => {
 
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={[styles.inputGroup, { zIndex: 10 }]}> 
-            <Text style={styles.label}>Họ và tên</Text>
+            <Text style={styles.label}>Số điện thoại</Text>
             <TextInput
               style={styles.input}
-              value={userName}
+              value={phone}
               onChangeText={(text) => {
-                const capitalized = capitalizeAfterSpaces(text);
-                setUserNameStr(capitalized);
-                if (borrowerId) setBorrowerId(null); 
+                setPhone(text);
+                if (borrowerId) {
+                  setBorrowerId(null);
+                  setIsSaveContactDisabled(false);
+                  setIsSaveContact(false);
+                  setSelectedFromContacts(false);
+                }
               }}
-              placeholder="Nhập họ và tên người liên quan"
+              placeholder="Nhập số điện thoại"
               placeholderTextColor="#AAAAAA"
+              keyboardType="phone-pad"
             />
             {showSuggestions && filteredContacts.length > 0 && (
               <View style={styles.suggestionsContainer}>
@@ -489,32 +511,34 @@ const AddTransactionScreen = () => {
                       style={styles.suggestionItem}
                       onPress={() => {
                         setUserNameStr(item.name);
-                        setBorrowerId(item.id); 
+                        setBorrowerId(item.id);
                         setShowSuggestions(false);
-                        setShowPhoneInput(false);
-                        setPhone("");
-                        setIsSaveContact(false);
+                        setShowNameInput(false);
+                        setIsSaveContact(true);
+                        setIsSaveContactDisabled(true);
+                        setSelectedFromContacts(true);
                       }}
                     >
                       <Text style={styles.suggestionText}>{item.name}</Text>
-                      {item.phone && <Text style={{color: '#888', fontSize: 12}}>{item.phone}</Text>}
+                      <Text style={{color: '#888', fontSize: 12}}>{item.phone}</Text>
                     </TouchableOpacity>
                   ))}
               </View>
             )}
-            {showPhoneInput && (
+            {showNameInput && (
               <View style={{marginTop: 20}}>
-                <Text style={styles.label}>Số điện thoại</Text>
                 <TextInput
                   style={styles.input}
-                  value={phone}
-                  onChangeText={setPhone}
-                  placeholder="Nhập số điện thoại"
+                  value={userName}
+                  onChangeText={(text) => {
+                    const capitalized = capitalizeAfterSpaces(text);
+                    setUserNameStr(capitalized);
+                  }}
+                  placeholder="Nhập họ và tên"
                   placeholderTextColor="#AAAAAA"
-                  keyboardType="phone-pad"
                 />
                 <View style={[styles.checkboxContainer, { marginTop: 10 }]}>
-                  <Checkbox style={styles.checkbox} value={isSaveContact} onValueChange={setIsSaveContact} color={isSaveContact ? '#3875F6' : undefined} />
+                  <Checkbox style={styles.checkbox} value={isSaveContact} onValueChange={setIsSaveContact} color={isSaveContact ? '#3875F6' : undefined} disabled={isSaveContactDisabled} />
                   <Text style={styles.checkboxLabel}>Lưu vào danh sách</Text>
                 </View>
               </View>
