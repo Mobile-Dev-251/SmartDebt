@@ -5,34 +5,86 @@ import { colors } from "@/constants/theme";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import * as Sentry from "@sentry/react-native";
+import * as Notifications from "expo-notifications";
 import { Platform, View } from "react-native";
-import { Provider, useDispatch } from 'react-redux';
-import { PersistGate } from 'redux-persist/integration/react';
-import { persistor, store } from '../store/store';
-import { useSelector } from 'react-redux';
-import { RootState } from '../store/store';
-import { validateCurrentRoute } from '../store/progress';
-import { useRouter } from 'expo-router';
+import { Provider, useDispatch } from "react-redux";
+import { PersistGate } from "redux-persist/integration/react";
+import { persistor, store } from "../store/store";
+import { useSelector } from "react-redux";
+import { RootState } from "../store/store";
+import { validateCurrentRoute } from "../store/progress";
+import { useRouter } from "expo-router";
 
 // Component để handle navigation sau khi fonts loaded
 function NavigationHandler() {
   const router = useRouter();
   const { user, isLoading } = useSelector((state: RootState) => state.auth);
-  
+
   useEffect(() => {
     if (!isLoading) {
       const timer = setTimeout(() => {
         if (user) {
-          router.replace('/(tabs)/home');
+          router.replace("/(tabs)/home");
         } else {
-          router.replace('/OnboardingScreen');
+          router.replace("/OnboardingScreen");
         }
       }, 100);
-      
+
       return () => clearTimeout(timer);
     }
   }, [router, user, isLoading]);
-  
+
+  return null;
+}
+
+function PushNotificationNavigation() {
+  const router = useRouter();
+
+  useEffect(() => {
+    // 1) Khi app đang chạy nền / foreground và user tap notification
+    const responseListener =
+      Notifications.addNotificationResponseReceivedListener((response) => {
+        const data = response.notification.request.content.data;
+        console.log("Push notification data:", data);
+        let params: any = {};
+        if (data?.debtId) {
+          router.push({
+            pathname: "/transaction-detail",
+            params: { id: data.debtId } as any,
+          });
+        } else if (data?.typeValue) {
+          router.push({
+            pathname: "/transaction-detail",
+            params: data as any,
+          });
+        }
+      });
+
+    // 2) Khi app đang bị kill và user tap notification để mở app
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) {
+        const data = response.notification.request.content.data;
+        console.log("Push notification data:", data);
+        let params: any = {};
+        if (data?.debtId) {
+          router.push({
+            pathname: "/transaction-detail",
+            params: { id: data.debtId } as any,
+          });
+        } else if (data?.typeValue) {
+          router.push({
+            pathname: "/transaction-detail",
+            params: data as any,
+          });
+        }
+      }
+    });
+
+    return () => {
+      responseListener.remove();
+    };
+  }, [router]);
+
   return null;
 }
 
@@ -68,8 +120,8 @@ export default Sentry.wrap(function RootLayout() {
   // Luôn luôn return Provider bọc ngoài cùng
   return (
     <Provider store={store}>
-      <PersistGate 
-        loading={null} 
+      <PersistGate
+        loading={null}
         persistor={persistor}
         onBeforeLift={() => {
           // Validate currentRoute khi app start
@@ -85,6 +137,7 @@ export default Sentry.wrap(function RootLayout() {
           <>
             <StatusBar style="light" backgroundColor={colors.Neutral200} />
             <NavigationHandler />
+            <PushNotificationNavigation />
             <Stack
               screenOptions={{
                 headerShown: false,
@@ -92,22 +145,49 @@ export default Sentry.wrap(function RootLayout() {
                 animation: "slide_from_right",
               }}
             >
+              <Stack.Screen name="index" options={{ title: "Smart Debt" }} />
               <Stack.Screen
-                name="index"
+                name="OnboardingScreen"
                 options={{ title: "Smart Debt" }}
               />
-              <Stack.Screen name="OnboardingScreen" options={{ title: "Smart Debt" }} />
-              <Stack.Screen name="auth/AuthScreen" options={{ title: "Auth" }} />
+              <Stack.Screen
+                name="auth/AuthScreen"
+                options={{ title: "Auth" }}
+              />
               <Stack.Screen name="auth/login" options={{ title: "Login" }} />
-              <Stack.Screen name="auth/register" options={{ title: "Register" }} />
+              <Stack.Screen
+                name="auth/register"
+                options={{ title: "Register" }}
+              />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="screen/add-transaction" options={{ title: "Thêm giao dịch" }} />
-              <Stack.Screen name="screen/create-group" options={{ title: "Tạo nhóm" }} />
-              <Stack.Screen name="notifications" options={{ title: "Thông báo" }} />
-              <Stack.Screen name="transaction-detail" options={{ title: "Chi tiết giao dịch" }} />
-              <Stack.Screen name="profile-info" options={{ title: "Thông tin cá nhân" }} />
-              <Stack.Screen name="help-center" options={{ title: "Trung tâm trợ giúp" }} />
-              <Stack.Screen name="app-info" options={{ title: "Thông tin ứng dụng" }} />
+              <Stack.Screen
+                name="screen/add-transaction"
+                options={{ title: "Thêm giao dịch" }}
+              />
+              <Stack.Screen
+                name="screen/create-group"
+                options={{ title: "Tạo nhóm" }}
+              />
+              <Stack.Screen
+                name="notifications"
+                options={{ title: "Thông báo" }}
+              />
+              <Stack.Screen
+                name="transaction-detail"
+                options={{ title: "Chi tiết giao dịch" }}
+              />
+              <Stack.Screen
+                name="profile-info"
+                options={{ title: "Thông tin cá nhân" }}
+              />
+              <Stack.Screen
+                name="help-center"
+                options={{ title: "Trung tâm trợ giúp" }}
+              />
+              <Stack.Screen
+                name="app-info"
+                options={{ title: "Thông tin ứng dụng" }}
+              />
             </Stack>
           </>
         )}
